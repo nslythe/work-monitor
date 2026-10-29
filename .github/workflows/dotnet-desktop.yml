@@ -77,6 +77,9 @@ jobs:
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
 
+    - name: Install WiX
+      run: dotnet tool install --global wix      
+
     # Execute all unit tests in the solution
     # - name: Execute unit tests
     #   run: dotnet test
