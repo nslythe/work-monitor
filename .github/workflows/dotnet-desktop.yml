@@ -1,25 +1,20 @@
-
-name: .NET Core Desktop
+name: .NET Desktop
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
 
   build:
 
-    strategy:
-      matrix:
-        configuration: [Debug, Release]
-
-    runs-on: windows-latest  # For a list of available runner types, refer to
-                             # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
-
-    env:
-      Solution_Name: your-solution-name                         # Replace with your solution name, i.e. MyWpfApp.sln.
+    runs-on: windows-latest
 
     steps:
     - name: Checkout
@@ -27,16 +22,20 @@ jobs:
       with:
         fetch-depth: 0
 
-    # Install the .NET Core workload
+    # The net48 targeting pack ships with the Windows runner image.
     - name: Install .NET
       uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '8.0.x'
 
-    # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
-    - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v2
+    # Builds "work monitor.sln" in Release, then packages dist/WorkMonitor-<version>-x64.msi.
+    - name: Build Release and MSI
+      shell: pwsh
+      run: .\build-msi.ps1
 
-    - name: Install WiX
-      run: dotnet tool install --global wix
-      
+    - name: Upload MSI
+      uses: actions/upload-artifact@v4
+      with:
+        name: WorkMonitor-msi
+        path: dist/*.msi
+        if-no-files-found: error
