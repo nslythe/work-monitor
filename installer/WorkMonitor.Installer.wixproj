@@ -1,0 +1,28 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputName>WorkMonitor</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+
+    <!-- Overridden by build-msi.ps1 so the MSI version matches the application. -->
+    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0</AppVersion>
+
+    <!-- The Release output of the WPF project, which also becomes the MSI payload. -->
+    <AppSourceDir Condition="'$(AppSourceDir)' == ''">$(MSBuildThisFileDirectory)..\work monitor\bin\Release\net48</AppSourceDir>
+
+    <DefineConstants>AppVersion=$(AppVersion);AppSourceDir=$(AppSourceDir)</DefineConstants>
+
+    <!--
+      ICE61: AllowSameVersionUpgrades is deliberate, so repairing with the same version works.
+      ICE91: a per-user package intentionally installs to one profile, not to every profile.
+    -->
+    <SuppressIces>ICE61;ICE91</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>

@@ -12,6 +12,15 @@ namespace work_monitor
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            if (HasQuitArgument(e.Args))
+            {
+                // The installer or a script asks a running copy to stop before its files are
+                // replaced. Quitting this way flushes the session to history, unlike a kill.
+                SingleInstanceGuard.SignalExistingInstanceToQuit();
+                Shutdown();
+                return;
+            }
+
             _instanceGuard = SingleInstanceGuard.TryAcquire();
 
             if (_instanceGuard is null)
@@ -41,7 +50,33 @@ namespace work_monitor
                 }));
             };
 
+            _instanceGuard.QuitRequested += (_, _) =>
+            {
+                window.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (window.Dispatcher.HasShutdownStarted)
+                    {
+                        return;
+                    }
+
+                    window.PrepareForShutdown();
+                }));
+            };
+
             window.Show();
+        }
+
+        private static bool HasQuitArgument(string[] arguments)
+        {
+            foreach (string argument in arguments)
+            {
+                if (string.Equals(argument, "--quit", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         protected override void OnSessionEnding(SessionEndingCancelEventArgs e)

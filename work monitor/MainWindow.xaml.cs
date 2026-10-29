@@ -355,9 +355,17 @@ namespace work_monitor
         {
             try
             {
-                return StartupRegistration.IsEnabled();
+                if (!StartupRegistration.IsEnabled())
+                {
+                    return false;
+                }
+
+                // The executable may have moved since the entry was created, for example when
+                // the application was installed or updated, so refresh the stored path.
+                StartupRegistration.Enable();
+                return true;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException or InvalidOperationException)
             {
                 return false;
             }

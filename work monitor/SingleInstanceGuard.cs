@@ -6,17 +6,20 @@ namespace work_monitor
 {
     /// <summary>
     /// Makes sure only one Work Monitor instance runs per user session. A second launch
-    /// signals the running instance to show its window and then exits.
+    /// signals the running instance to show its window, or to quit when it was started with
+    /// <c>--quit</c>, and then exits.
     /// </summary>
     public sealed class SingleInstanceGuard : IDisposable
     {
         private const string MutexName = @"Local\WorkMonitor.SingleInstance";
         private const string ShowEventName = @"Local\WorkMonitor.ShowWindow";
+        private const string QuitEventName = @"Local\WorkMonitor.Quit";
         private const int SignalRetryCount = 10;
         private const int SignalRetryDelayMilliseconds = 100;
 
         private readonly Mutex _mutex;
         private readonly EventWaitHandle _showEvent;
+        private readonly EventWaitHandle _quitEvent;
         private readonly EventWaitHandle _stopEvent;
         private readonly Thread _listener;
 
@@ -28,10 +31,18 @@ namespace work_monitor
         /// </summary>
         public event EventHandler? ShowRequested;
 
-        private SingleInstanceGuard(Mutex mutex, EventWaitHandle showEvent, EventWaitHandle stopEvent)
+        /// <summary>
+        /// Raised on a background thread when another launch asks this instance to quit, for
+        /// example from the installer before files are replaced. Handlers must marshal to the
+        /// UI thread.
+        /// </summary>
+        public event EventHandler? QuitRequested;
+
+        private SingleInstanceGuard(Mutex mutex, EventWaitHandle showEvent, EventWaitHandle quitEvent, EventWaitHandle stopEvent)
         {
             _mutex = mutex;
             _showEvent = showEvent;
+            _quitEvent = quitEvent;
             _stopEvent = stopEvent;
             _listener = new Thread(Listen)
             {
@@ -56,9 +67,10 @@ namespace work_monitor
             }
 
             var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName, out _);
+            var quitEvent = new EventWaitHandle(false, EventResetMode.AutoReset, QuitEventName, out _);
             var stopEvent = new EventWaitHandle(false, EventResetMode.ManualReset);
 
-            return new SingleInstanceGuard(mutex, showEvent, stopEvent);
+            return new SingleInstanceGuard(mutex, showEvent, quitEvent, stopEvent);
         }
 
         /// <summary>Tells the running instance to bring its window back.</summary>
@@ -66,36 +78,65 @@ namespace work_monitor
         {
             // The running instance creates the event right after taking the mutex. If a second
             // launch happens in that tiny window, retry briefly instead of losing the request.
+            SignalEvent(ShowEventName);
+        }
+
+        /// <summary>
+        /// Tells the running instance to quit, saving its state and history as if the Quit item
+        /// in the notification area had been used.
+        /// </summary>
+        /// <returns><c>true</c> when a running instance was asked to quit.</returns>
+        public static bool SignalExistingInstanceToQuit()
+        {
+            return SignalEvent(QuitEventName);
+        }
+
+        private static bool SignalEvent(string eventName)
+        {
             for (int attempt = 0; attempt < SignalRetryCount; attempt++)
             {
                 try
                 {
-                    if (EventWaitHandle.TryOpenExisting(ShowEventName, out EventWaitHandle? handle))
+                    if (EventWaitHandle.TryOpenExisting(eventName, out EventWaitHandle? handle))
                     {
                         using (handle)
                         {
                             handle.Set();
                         }
 
-                        return;
+                        return true;
                     }
                 }
                 catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or WaitHandleCannotBeOpenedException)
                 {
-                    return;
+                    return false;
                 }
 
                 Thread.Sleep(SignalRetryDelayMilliseconds);
             }
+
+            return false;
         }
 
         private void Listen()
         {
-            WaitHandle[] handles = { _showEvent, _stopEvent };
+            WaitHandle[] handles = { _showEvent, _quitEvent, _stopEvent };
 
-            while (WaitHandle.WaitAny(handles) == 0)
+            while (true)
             {
-                ShowRequested?.Invoke(this, EventArgs.Empty);
+                switch (WaitHandle.WaitAny(handles))
+                {
+                    case 0:
+                        ShowRequested?.Invoke(this, EventArgs.Empty);
+                        break;
+
+                    case 1:
+                        QuitRequested?.Invoke(this, EventArgs.Empty);
+                        break;
+
+                    default:
+                        return;
+                }
             }
         }
 
@@ -116,6 +157,7 @@ namespace work_monitor
             }
 
             _showEvent.Dispose();
+            _quitEvent.Dispose();
             _stopEvent.Dispose();
 
             _mutex.ReleaseMutex();

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+    <!-- %LOCALAPPDATA%\Programs\Work Monitor -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Work Monitor" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Per-user Start menu group: %APPDATA%\Microsoft\Windows\Start Menu\Programs\Work Monitor -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Work Monitor" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <!--
+      Every component that installs into the user profile is keyed on a registry value under
+      HKCU, as the Windows Installer requires (ICE38). The registry values also give the
+      installer a reliable way to detect a component that is already installed.
+    -->
+    <ComponentGroup Id="ApplicationFiles">
+      <Component Id="WorkMonitorApplication" Directory="INSTALLFOLDER" Guid="EB678164-D2D6-406A-8761-903FA4CCFA7D">
+        <File Id="WorkMonitorExeFile"
+              Source="$(var.AppSourceDir)\work monitor.exe" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Work Monitor\Components"
+                       Name="WorkMonitorApplication"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+        <!-- Removes the application folder on uninstall once the last file is gone. -->
+        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+      </Component>
+
+      <Component Id="WorkMonitorConfiguration" Directory="INSTALLFOLDER" Guid="B0467E3E-B7CA-4DC9-AC2E-BFB9238DA6E2">
+        <File Id="WorkMonitorConfigFile"
+              Source="$(var.AppSourceDir)\work monitor.exe.config" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Work Monitor\Components"
+                       Name="WorkMonitorConfiguration"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+
+      <Component Id="NewtonsoftJson" Directory="INSTALLFOLDER" Guid="16DA0A43-3AC8-4363-ABBB-EFCC6F0195BD">
+        <File Id="NewtonsoftJsonFile"
+              Source="$(var.AppSourceDir)\Newtonsoft.Json.dll" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Work Monitor\Components"
+                       Name="NewtonsoftJson"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+
+      <!-- The shared %LOCALAPPDATA%\Programs folder is only removed when it is empty. -->
+      <Component Id="ProgramsFolderCleanup" Directory="ProgramsFolder" Guid="D5A44A63-6F89-4DBC-9438-4A082456B5AA">
+        <RegistryValue Root="HKCU"
+                       Key="Software\Work Monitor\Components"
+                       Name="ProgramsFolderCleanup"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+        <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
+      </Component>
+
+      <!--
+        Uninstalling removes the "start with Windows" entry the application registered, since
+        it points at the executable this package is about to delete. Settings and history under
+        %APPDATA%\WorkMonitor are deliberately left alone.
+      -->
+      <Component Id="StartupEntryCleanup" Directory="INSTALLFOLDER" Guid="411EACBC-D1ED-425F-B4FD-75A31F1048BC">
+        <RegistryValue Root="HKCU"
+                       Key="Software\Work Monitor"
+                       Name="StartupEntryCleanup"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+        <RemoveRegistryValue Root="HKCU"
+                             Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                             Name="WorkMonitor" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="ApplicationShortcuts">
+      <Component Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Guid="FF6CC23E-A6BA-4B44-9A6F-8A4733BC10C8">
+        <Shortcut Id="WorkMonitorStartMenuShortcut"
+                  Name="Work Monitor"
+                  Description="Tracks whether you are working and keeps a weekly history."
+                  Target="[INSTALLFOLDER]work monitor.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Work Monitor"
+                       Name="StartMenuShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>
