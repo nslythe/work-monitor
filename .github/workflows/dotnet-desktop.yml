@@ -79,21 +79,22 @@ jobs:
 
     - name: Install WiX
       run: dotnet tool install --global wix
-
-    - name: Build
-      shell: pwsh
-      run: |
-        .\uild-msi.ps1
-
+      
     # Execute all unit tests in the solution
     # - name: Execute unit tests
     #   run: dotnet test
 
     # Restore the application to populate the obj folder with RuntimeIdentifiers
-    # - name: Restore the application
-    #   run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
-    #   env:
-    #     Configuration: ${{ matrix.configuration }}
+    - name: Restore the application
+      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration
+      env:
+        Configuration: ${{ matrix.configuration }}
+
+    - name: Build MSI
+      shell: pwsh
+      run: |
+        .\uild-msi.ps1
+
 
     # Decode the base 64 encoded pfx and save the Signing_Certificate
     # - name: Decode the pfx
