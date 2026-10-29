@@ -78,7 +78,12 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Install WiX
-      run: dotnet tool install --global wix      
+      run: dotnet tool install --global wix
+
+    - name: Build
+      shell: pwsh
+      run: |
+        .\uild-msi.ps1
 
     # Execute all unit tests in the solution
     # - name: Execute unit tests
