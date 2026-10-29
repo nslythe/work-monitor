@@ -210,6 +210,7 @@ namespace work_monitor
         {
             LastActivityText.Text = _monitor.LastActivityUtc.ToLocalTime().ToString("HH:mm:ss");
             IdleTimeText.Text = $"{FormatDuration(_monitor.IdleFor)} / {FormatDuration(_monitor.IdleTimeout)}";
+            UpdateTodayWorkTime();
 
             // State changes are only raised on transitions, so keep the description of the most
             // recent activity (mouse or keyboard) current while the state stays Working. During a
@@ -222,6 +223,45 @@ namespace work_monitor
                     ? $"No input for {FormatDuration(idleFor)}. Not working after {FormatDuration(_monitor.IdleTimeout)}."
                     : DescribeActivity(_monitor.LastActivitySource);
             }
+        }
+
+        private void UpdateTodayWorkTime()
+        {
+            DateTime today = DateTime.Today;
+            TimeSpan total = TimeSpan.Zero;
+
+            string weekId = HistoryStore.GetWeekId(HistoryStore.GetWeekStart(today));
+            if (HistoryStore.LoadWeek(weekId) is { } week)
+            {
+                foreach (DayHistory day in week.Days)
+                {
+                    if (day.Date != today)
+                    {
+                        continue;
+                    }
+
+                    foreach (WorkRecord record in day.Records)
+                    {
+                        if (record.Stop is { } stop)
+                        {
+                            total += stop - record.Start;
+                        }
+                    }
+                }
+            }
+
+            if (_historyRecorder.CurrentSessionStart is { } sessionStart &&
+                sessionStart.LocalDateTime.Date == today)
+            {
+                TimeSpan elapsed = DateTimeOffset.Now - sessionStart;
+                if (elapsed < TimeSpan.Zero)
+                {
+                    elapsed = TimeSpan.Zero;
+                }
+                total += elapsed;
+            }
+
+            TodayWorkTimeCardText.Text = $"Today: {FormatDuration(total)}";
         }
 
         private void UpdateFooter()
@@ -431,6 +471,7 @@ namespace work_monitor
                 }
 
                 RefreshHistory();
+                UpdateTodayWorkTime();
             }));
         }
 

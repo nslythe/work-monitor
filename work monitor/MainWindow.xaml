@@ -57,6 +57,13 @@
                                        FontSize="14"
                                        Foreground="White"
                                        Opacity="0.85" />
+                             <TextBlock x:Name="TodayWorkTimeCardText"
+                                        Text="Today: 0m 00s"
+                                        Margin="0,10,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="18"
+                                        FontWeight="SemiBold"
+                                        Foreground="White" />
                         </StackPanel>
                     </Border>
 
