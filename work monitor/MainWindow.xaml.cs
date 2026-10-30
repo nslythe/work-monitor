@@ -443,6 +443,19 @@ namespace work_monitor
             RefreshHistory();
         }
 
+        private void HistoryListView_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is TextBlock textBlock && textBlock.Text.Length >= 5)
+            {
+                string value = textBlock.Text.Substring(0, 5);
+                if (value.Contains(':'))
+                {
+                    Clipboard.SetText(value);
+                    e.Handled = true;
+                }
+            }
+        }
+
         private void OpenHistoryFolderButton_Click(object sender, RoutedEventArgs e)
         {
             try
