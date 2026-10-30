@@ -102,6 +102,13 @@
                                TextWrapping="Wrap"
                                FontSize="12"
                                Foreground="#616E7C" />
+                    <TextBlock x:Name="VersionText"
+                               Grid.Row="2"
+                               Margin="0,4,0,0"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Bottom"
+                               FontSize="11"
+                               Foreground="#9AA5B1" />
                 </Grid>
             </TabItem>
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Reflection;
 using System.IO;
 using System.Security;
 using System.Windows;
@@ -40,6 +41,8 @@ namespace work_monitor
             _historyRecorder = new WorkSessionRecorder(_monitor);
 
             InitializeComponent();
+
+            VersionText.Text = $"Version {Assembly.GetExecutingAssembly().GetName().Version}";
 
             _trayIcon = new TrayIcon(_monitor.State);
             _trayIcon.OpenRequested += TrayIcon_OpenRequested;
