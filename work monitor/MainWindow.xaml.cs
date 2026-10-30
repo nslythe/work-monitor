@@ -64,6 +64,7 @@ namespace work_monitor
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             _monitor.Start();
+            _historyRecorder.ResumeLastSessionIfNeeded();
             UpdateStatus(_monitor.State, _monitor.LastActivitySource);
             UpdateActivityInfo();
             RefreshHistory();

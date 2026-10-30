@@ -107,6 +107,64 @@ namespace work_monitor
             }
         }
 
+        /// <summary>Returns the most recently completed work record, or <c>null</c> when there is none.</summary>
+        public static WorkRecord? GetLastCompletedRecord()
+        {
+            lock (Gate)
+            {
+                foreach (string weekId in ListWeeks())
+                {
+                    WeekHistory? week = LoadWeekFile(weekId);
+                    if (week is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (DayHistory day in week.Days.OrderByDescending(entry => entry.Date))
+                    {
+                        foreach (WorkRecord record in day.Records.OrderByDescending(entry => entry.Stop ?? entry.Start))
+                        {
+                            if (record.Stop.HasValue)
+                            {
+                                return record;
+                            }
+                        }
+                    }
+                }
+
+                return null;
+            }
+        }
+
+        /// <summary>Removes the completed record matching the given start and stop times.</summary>
+        public static bool RemoveCompletedRecord(DateTimeOffset start, DateTimeOffset stop)
+        {
+            lock (Gate)
+            {
+                foreach (string weekId in ListWeeks())
+                {
+                    WeekHistory? week = LoadWeekFile(weekId);
+                    if (week is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (DayHistory day in week.Days)
+                    {
+                        int index = day.Records.FindIndex(record => record.Start == start && record.Stop == stop);
+                        if (index >= 0)
+                        {
+                            day.Records.RemoveAt(index);
+                            SaveWeekFile(weekId, week);
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+        }
+
         /// <summary>Creates the history folder and opens it in Explorer.</summary>
         public static void OpenFolder()
         {

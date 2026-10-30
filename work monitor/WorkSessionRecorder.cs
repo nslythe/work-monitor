@@ -148,6 +148,43 @@ namespace work_monitor
             return new DateTimeOffset(unspecified).ToLocalTime();
         }
 
+        /// <summary>
+        /// If the last completed record ended within the idle timeout, resume it as the
+        /// active session instead of starting a new one. Called at application startup.
+        /// </summary>
+        public void ResumeLastSessionIfNeeded()
+        {
+            bool changed = false;
+
+            lock (_gate)
+            {
+                if (_sessionStart is not null)
+                {
+                    return;
+                }
+
+                WorkRecord? last = HistoryStore.GetLastCompletedRecord();
+                if (last is null || !last.Stop.HasValue)
+                {
+                    return;
+                }
+
+                if (DateTimeOffset.Now - last.Stop.Value >= _monitor.IdleTimeout)
+                {
+                    return;
+                }
+
+                HistoryStore.RemoveCompletedRecord(last.Start, last.Stop.Value);
+                _sessionStart = last.Start;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                HistoryChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
         public void Dispose()
         {
             if (_disposed)
