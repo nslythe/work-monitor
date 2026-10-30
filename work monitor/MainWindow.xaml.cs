@@ -29,6 +29,7 @@ namespace work_monitor
         private readonly MouseActivityMonitor _monitor;
         private readonly WorkSessionRecorder _historyRecorder;
         private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _copyFeedbackTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
         private readonly TrayIcon _trayIcon;
 
         private bool _loadingHistory;
@@ -53,6 +54,7 @@ namespace work_monitor
             Icon = AppIcons.GetWindowIcon(_monitor.State);
 
             _refreshTimer.Tick += RefreshTimer_Tick;
+            _copyFeedbackTimer.Tick += CopyFeedbackTimer_Tick;
             _monitor.StateChanged += Monitor_StateChanged;
             _historyRecorder.HistoryChanged += HistoryRecorder_HistoryChanged;
 
@@ -451,9 +453,19 @@ namespace work_monitor
                 if (value.Contains(':'))
                 {
                     Clipboard.SetText(value);
+                    CopyStatusText.Text = $"Copied {value}";
+                    CopyStatusText.Visibility = Visibility.Visible;
+                    _copyFeedbackTimer.Stop();
+                    _copyFeedbackTimer.Start();
                     e.Handled = true;
                 }
             }
+        }
+
+        private void CopyFeedbackTimer_Tick(object? sender, EventArgs e)
+        {
+            _copyFeedbackTimer.Stop();
+            CopyStatusText.Visibility = Visibility.Collapsed;
         }
 
         private void OpenHistoryFolderButton_Click(object sender, RoutedEventArgs e)

@@ -1,4 +1,4 @@
-﻿<Window x:Class="work_monitor.MainWindow"
+<Window x:Class="work_monitor.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -305,11 +305,17 @@ PreviewMouseRightButtonDown="HistoryListView_PreviewMouseRightButtonDown">
                     <TextBlock x:Name="HistoryEmptyText"
                                Grid.Row="4"
                                Text="No work sessions recorded for this week yet."
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontSize="13"
-                               Foreground="#616E7C"
-                               Visibility="Collapsed" />
+                                Visibility="Collapsed" />
+
+                     <TextBlock x:Name="CopyStatusText"
+                                Grid.Row="4"
+                                Text="Copied"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,8,8"
+                                FontSize="12"
+                                Foreground="#1B7F3B"
+                                Visibility="Collapsed" />
                 </Grid>
             </TabItem>
         </TabControl>
