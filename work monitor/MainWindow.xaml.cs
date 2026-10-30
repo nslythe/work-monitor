@@ -261,7 +261,7 @@ namespace work_monitor
                 total += elapsed;
             }
 
-            TodayWorkTimeCardText.Text = $"Today: {FormatDuration(total)}";
+            TodayWorkTimeCardText.Text = $"Today: {FormatDurationNoSeconds(total)}";
         }
 
         private void UpdateFooter()
@@ -521,6 +521,7 @@ namespace work_monitor
             TimeSpan todayTotal = TimeSpan.Zero;
             TimeSpan weekTotal = TimeSpan.Zero;
             DateTime today = DateTime.Today;
+            var dayTotals = new Dictionary<DateTime, TimeSpan>();
 
             if (WeekComboBox.SelectedItem is WeekOption option &&
                 HistoryStore.LoadWeek(option.Id) is { } week)
@@ -539,6 +540,12 @@ namespace work_monitor
                         TimeSpan duration = stop - record.Start;
                         weekTotal += duration;
 
+                        if (!dayTotals.ContainsKey(day.Date))
+                        {
+                            dayTotals[day.Date] = TimeSpan.Zero;
+                        }
+                        dayTotals[day.Date] += duration;
+
                         if (day.Date == today)
                         {
                             todayTotal += duration;
@@ -548,7 +555,7 @@ namespace work_monitor
                             dateLabel,
                             record.Start.LocalDateTime.ToString("HH:mm:ss"),
                             stop.LocalDateTime.ToString("HH:mm:ss"),
-                            FormatDuration(duration)));
+                            FormatDurationNoSeconds(duration)));
                     }
                 }
             }
@@ -567,6 +574,12 @@ namespace work_monitor
                 DateTime sessionDay = sessionStart.LocalDateTime.Date;
                 weekTotal += elapsed;
 
+                if (!dayTotals.ContainsKey(sessionDay))
+                {
+                    dayTotals[sessionDay] = TimeSpan.Zero;
+                }
+                dayTotals[sessionDay] += elapsed;
+
                 if (sessionDay == today)
                 {
                     todayTotal += elapsed;
@@ -576,7 +589,22 @@ namespace work_monitor
                     FormatDateLabel(sessionDay),
                     sessionStart.LocalDateTime.ToString("HH:mm:ss"),
                     "in progress",
-                    FormatDuration(elapsed)));
+                    FormatDurationNoSeconds(elapsed)));
+            }
+
+            // Append per-day totals to the group (date) labels.
+            var dayTotalByLabel = new Dictionary<string, TimeSpan>();
+            foreach (KeyValuePair<DateTime, TimeSpan> kv in dayTotals)
+            {
+                dayTotalByLabel[FormatDateLabel(kv.Key)] = kv.Value;
+            }
+
+            foreach (HistoryRow row in rows)
+            {
+                if (dayTotalByLabel.TryGetValue(row.DateLabel, out TimeSpan dayTotal))
+                {
+                    row.DateLabel = $"{row.DateLabel}  —  Total: {FormatDurationNoSeconds(dayTotal)}";
+                }
             }
 
             HistoryListView.ItemsSource = new ListCollectionView(rows)
@@ -585,7 +613,7 @@ namespace work_monitor
             };
 
             HistoryEmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            HistorySummaryText.Text = $"Today: {FormatDuration(todayTotal)}    Week total: {FormatDuration(weekTotal)}";
+            HistorySummaryText.Text = $"Today: {FormatDurationNoSeconds(todayTotal)}    Week total: {FormatDurationNoSeconds(weekTotal)}";
 
             if (_historyRecorder.CurrentSessionStart is { } currentStart)
             {
@@ -634,6 +662,20 @@ namespace work_monitor
                 ? $"{hours}h {value.Minutes:00}m {value.Seconds:00}s"
                 : $"{(int)value.TotalMinutes}m {value.Seconds:00}s";
         }
+
+        private static string FormatDurationNoSeconds(TimeSpan value)
+        {
+            if (value < TimeSpan.Zero)
+            {
+                value = TimeSpan.Zero;
+            }
+
+            int hours = (int)value.TotalHours;
+
+            return hours > 0
+                ? $"{hours}h {value.Minutes:00}m"
+                : $"{(int)value.TotalMinutes}m";
+        }
     }
 
     internal sealed class HistoryRow
@@ -646,7 +688,7 @@ namespace work_monitor
             DurationText = durationText;
         }
 
-        public string DateLabel { get; }
+        public string DateLabel { get; set; }
 
         public string StartText { get; }
 
