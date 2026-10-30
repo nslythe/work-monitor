@@ -6,9 +6,11 @@ on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+  release:
+    types: [created]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
 
@@ -33,9 +35,15 @@ jobs:
       shell: pwsh
       run: .\build-msi.ps1
 
-    - name: Upload MSI
+    - name: Upload MSI artifact
       uses: actions/upload-artifact@v4
       with:
         name: WorkMonitor-msi
         path: dist/*.msi
         if-no-files-found: error
+
+    - name: Upload MSI to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*.msi
