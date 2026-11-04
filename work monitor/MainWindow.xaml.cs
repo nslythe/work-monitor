@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
 using System.IO;
+using System.IO.Compression;
 using System.Security;
 using System.Windows;
 using System.Windows.Controls;
@@ -490,6 +491,40 @@ namespace work_monitor
             {
                 RefreshHistory();
                 UpdateTodayWorkTime();
+            }
+        }
+
+        private void ArchiveHistoryButton_Click(object sender, RoutedEventArgs e)
+        {
+            string zipPath = Path.Combine(Path.GetDirectoryName(HistoryStore.HistoryDirectory)!, "archive.zip");
+            try
+            {
+                if (File.Exists(zipPath))
+                {
+                    File.Delete(zipPath);
+                }
+
+                if (Directory.Exists(HistoryStore.HistoryDirectory) && Directory.EnumerateFileSystemEntries(HistoryStore.HistoryDirectory).Any())
+                {
+                    ZipFile.CreateFromDirectory(HistoryStore.HistoryDirectory, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+                }
+                else
+                {
+                    using (FileStream fs = File.Create(zipPath))
+                    using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Create))
+                    {
+                    }
+                }
+
+                HistoryErrorText.Text = $"History archived to {zipPath}";
+                HistoryErrorText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1F, 0x29, 0x33));
+                HistoryErrorText.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                HistoryErrorText.Text = $"The history could not be archived: {ex.Message}";
+                HistoryErrorText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xB3, 0x26, 0x1E));
+                HistoryErrorText.Visibility = Visibility.Visible;
             }
         }
 
