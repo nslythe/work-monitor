@@ -468,6 +468,31 @@ namespace work_monitor
             CopyStatusText.Visibility = Visibility.Collapsed;
         }
 
+        private void DeleteHistoryMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (HistoryListView.SelectedItem is not HistoryRow row || row.Stop is null)
+            {
+                return;
+            }
+
+            MessageBoxResult confirm = MessageBox.Show(
+                "Delete this session and merge adjacent sessions?",
+                "Delete history record",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            if (HistoryStore.DeleteRecord(row.Start, row.Stop.Value))
+            {
+                RefreshHistory();
+                UpdateTodayWorkTime();
+            }
+        }
+
         private void OpenHistoryFolderButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -584,7 +609,9 @@ namespace work_monitor
                             dateLabel,
                             record.Start.LocalDateTime.ToString("HH:mm:ss"),
                             stop.LocalDateTime.ToString("HH:mm:ss"),
-                            FormatDurationNoSeconds(duration)));
+                            FormatDurationNoSeconds(duration),
+                            record.Start,
+                            record.Stop));
                     }
                 }
             }
@@ -618,7 +645,9 @@ namespace work_monitor
                     FormatDateLabel(sessionDay),
                     sessionStart.LocalDateTime.ToString("HH:mm:ss"),
                     "in progress",
-                    FormatDurationNoSeconds(elapsed)));
+                    FormatDurationNoSeconds(elapsed),
+                    sessionStart,
+                    null));
             }
 
             // Append per-day totals to the group (date) labels.
@@ -709,12 +738,14 @@ namespace work_monitor
 
     internal sealed class HistoryRow
     {
-        public HistoryRow(string dateLabel, string startText, string stopText, string durationText)
+        public HistoryRow(string dateLabel, string startText, string stopText, string durationText, DateTimeOffset start, DateTimeOffset? stop)
         {
             DateLabel = dateLabel;
             StartText = startText;
             StopText = stopText;
             DurationText = durationText;
+            Start = start;
+            Stop = stop;
         }
 
         public string DateLabel { get; set; }
@@ -724,6 +755,10 @@ namespace work_monitor
         public string StopText { get; }
 
         public string DurationText { get; }
+
+        public DateTimeOffset Start { get; }
+
+        public DateTimeOffset? Stop { get; }
     }
 
     internal sealed class WeekOption

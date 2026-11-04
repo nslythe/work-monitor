@@ -165,6 +165,66 @@ namespace work_monitor
             }
         }
 
+        /// <summary>
+        /// Deletes the completed record matching the given start and stop times. When both a
+        /// previous and a next record exist on the same day, they are merged into a single
+        /// session (previous start to next stop). Returns false when the record is not found or
+        /// is still in progress.
+        /// </summary>
+        public static bool DeleteRecord(DateTimeOffset start, DateTimeOffset stop)
+        {
+            if (stop <= start)
+            {
+                return false;
+            }
+
+            lock (Gate)
+            {
+                foreach (string weekId in ListWeeks())
+                {
+                    WeekHistory? week = LoadWeekFile(weekId);
+                    if (week is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (DayHistory day in week.Days)
+                    {
+                        int index = day.Records.FindIndex(record => record.Start == start && record.Stop == stop);
+                        if (index < 0)
+                        {
+                            continue;
+                        }
+
+                        day.Records.RemoveAt(index);
+
+                        // Merge the neighbours into one session when both exist.
+                        if (index > 0 && index < day.Records.Count)
+                        {
+                            WorkRecord previous = day.Records[index - 1];
+                            WorkRecord next = day.Records[index];
+                            if (previous.Stop.HasValue)
+                            {
+                                previous.Stop = next.Stop;
+                                day.Records.RemoveAt(index);
+                            }
+                        }
+
+                        // Drop empty days.
+                        if (day.Records.Count == 0)
+                        {
+                            week.Days.Remove(day);
+                        }
+
+                        SaveWeekFile(weekId, week);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
         /// <summary>Creates the history folder and opens it in Explorer.</summary>
         public static void OpenFolder()
         {

@@ -264,6 +264,11 @@
                               Background="Transparent"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
 PreviewMouseRightButtonDown="HistoryListView_PreviewMouseRightButtonDown">
+                        <ListView.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Delete" Click="DeleteHistoryMenuItem_Click" />
+                            </ContextMenu>
+                        </ListView.ContextMenu>
                         <ListView.GroupStyle>
                             <GroupStyle>
                                 <GroupStyle.HeaderTemplate>
