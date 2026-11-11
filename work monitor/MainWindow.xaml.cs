@@ -194,7 +194,9 @@ namespace work_monitor
                 default:
                     StatusCard.Background = NotWorkingBackground;
                     StateText.Text = "Not working";
-                    StateDetailText.Text = $"No mouse or keyboard activity for {FormatDuration(_monitor.IdleTimeout)}.";
+                    StateDetailText.Text = _monitor.IsWorkstationLocked
+                        ? "The workstation is locked."
+                        : $"No mouse or keyboard activity for {FormatDuration(_monitor.IdleTimeout)}.";
                     break;
             }
 
@@ -222,7 +224,12 @@ namespace work_monitor
             // State changes are only raised on transitions, so keep the description of the most
             // recent activity (mouse or keyboard) current while the state stays Working. During a
             // pause that has not reached the timeout yet, show how long there has been no input.
-            if (_monitor.State == WorkState.Working)
+            // While the workstation is locked, that is shown instead of describing input.
+            if (_monitor.IsWorkstationLocked)
+            {
+                StateDetailText.Text = "The workstation is locked.";
+            }
+            else if (_monitor.State == WorkState.Working)
             {
                 TimeSpan idleFor = _monitor.IdleFor;
 
@@ -274,11 +281,13 @@ namespace work_monitor
         private void UpdateFooter()
         {
             FooterText.Text =
-                "Mouse movement and keyboard input are checked twice a second on a background thread. " +
-                "While the mouse moves or keys are pressed the state is Working, and it stays Working " +
-                $"during shorter pauses. After {FormatDuration(_monitor.IdleTimeout)} without any activity " +
-                "it becomes Not working. Any activity switches it back to Working. The state is kept when " +
-                "the application restarts, including after a reboot, while the timeout has not passed.";
+                "Mouse movement and keyboard input are checked twice a second on a background thread, " +
+                "and only counted while the workstation is unlocked. While the mouse moves or keys are " +
+                "pressed the state is Working, and it stays Working during shorter pauses. After " +
+                $"{FormatDuration(_monitor.IdleTimeout)} without any activity it becomes Not working, and " +
+                "locking the workstation does so right away, since input on the lock screen is ignored. " +
+                "Any activity while unlocked switches it back to Working. The state is kept when the " +
+                "application restarts, including after a reboot, while the timeout has not passed.";
         }
 
         private void TimeoutTextBox_TextChanged(object sender, TextChangedEventArgs e)

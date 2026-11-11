@@ -150,7 +150,8 @@ namespace work_monitor
 
         /// <summary>
         /// If the last completed record ended within the idle timeout, resume it as the
-        /// active session instead of starting a new one. Called at application startup.
+        /// active session instead of starting a new one. A locked workstation never resumes
+        /// a session. Called at application startup.
         /// </summary>
         public void ResumeLastSessionIfNeeded()
         {
@@ -169,7 +170,9 @@ namespace work_monitor
                     return;
                 }
 
-                if (DateTimeOffset.Now - last.Stop.Value >= _monitor.IdleTimeout)
+                // A locked workstation is not a running session, even within the timeout, so
+                // the record stays completed and a fresh session starts after unlocking.
+                if (_monitor.IsWorkstationLocked || DateTimeOffset.Now - last.Stop.Value >= _monitor.IdleTimeout)
                 {
                     return;
                 }
