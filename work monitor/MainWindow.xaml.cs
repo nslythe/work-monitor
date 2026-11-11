@@ -35,6 +35,7 @@ namespace work_monitor
 
         private bool _loadingHistory;
         private bool _allowClose;
+        private string? _rightClickedTimeText;
 
         public MainWindow()
         {
@@ -455,21 +456,74 @@ namespace work_monitor
             RefreshHistory();
         }
 
-        private void HistoryListView_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void HistoryDataGrid_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (e.OriginalSource is TextBlock textBlock && textBlock.Text.Length >= 5)
+            _rightClickedTimeText = null;
+
+            if (e.OriginalSource is not DependencyObject source)
             {
-                string value = textBlock.Text.Substring(0, 5);
-                if (value.Contains(':'))
-                {
-                    Clipboard.SetText(value);
-                    CopyStatusText.Text = $"Copied {value}";
-                    CopyStatusText.Visibility = Visibility.Visible;
-                    _copyFeedbackTimer.Stop();
-                    _copyFeedbackTimer.Start();
-                    e.Handled = true;
-                }
+                return;
             }
+
+            DataGridRow? row = FindAncestor<DataGridRow>(source);
+            if (row?.Item is not HistoryRow historyRow)
+            {
+                // Right-clicking outside a session row clears the selection, so the context
+                // menu actions have nothing to act on.
+                HistoryDataGrid.SelectedItem = null;
+                return;
+            }
+
+            HistoryDataGrid.SelectedItem = historyRow;
+
+            if (FindAncestor<DataGridCell>(source) is { } cell)
+            {
+                int columnIndex = HistoryDataGrid.Columns.IndexOf(cell.Column);
+                _rightClickedTimeText = columnIndex switch
+                {
+                    0 => historyRow.StartText,
+                    1 => historyRow.StopText,
+                    _ => null
+                };
+            }
+        }
+
+        private void CopyHistoryTimeMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (HistoryDataGrid.SelectedItem is not HistoryRow row)
+            {
+                return;
+            }
+
+            string text = _rightClickedTimeText ?? row.StartText;
+            if (text.Length >= 5 && text.Contains(':'))
+            {
+                string value = text.Substring(0, 5);
+                Clipboard.SetText(value);
+                CopyStatusText.Text = $"Copied {value}";
+                CopyStatusText.Visibility = Visibility.Visible;
+                _copyFeedbackTimer.Stop();
+                _copyFeedbackTimer.Start();
+            }
+        }
+
+        private static T? FindAncestor<T>(DependencyObject source) where T : DependencyObject
+        {
+            DependencyObject? current = source;
+
+            while (current is not null)
+            {
+                if (current is T match)
+                {
+                    return match;
+                }
+
+                current = current is System.Windows.Media.Visual
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(current)
+                    : System.Windows.LogicalTreeHelper.GetParent(current);
+            }
+
+            return null;
         }
 
         private void CopyFeedbackTimer_Tick(object? sender, EventArgs e)
@@ -480,13 +534,44 @@ namespace work_monitor
 
         private void DeleteHistoryMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            if (HistoryListView.SelectedItem is not HistoryRow row || row.Stop is null)
+            if (HistoryDataGrid.SelectedItem is HistoryRow row)
+            {
+                DeleteRow(row);
+            }
+        }
+
+        private void DeleteRowButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement { DataContext: HistoryRow row })
+            {
+                DeleteRow(row);
+            }
+        }
+
+        private void HistoryDataGrid_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // While a cell is being edited, Delete edits text like in any other text box.
+            if (e.Key != System.Windows.Input.Key.Delete || e.OriginalSource is TextBox)
+            {
+                return;
+            }
+
+            if (HistoryDataGrid.SelectedItem is HistoryRow row)
+            {
+                DeleteRow(row);
+                e.Handled = true;
+            }
+        }
+
+        private void DeleteRow(HistoryRow row)
+        {
+            if (row.IsInProgress || row.Stop is not { } stop)
             {
                 return;
             }
 
             MessageBoxResult confirm = MessageBox.Show(
-                "Delete this session and merge adjacent sessions?",
+                "Delete this session?",
                 "Delete history record",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -496,11 +581,235 @@ namespace work_monitor
                 return;
             }
 
-            if (HistoryStore.DeleteRecord(row.Start, row.Stop.Value))
+            try
             {
-                RefreshHistory();
-                UpdateTodayWorkTime();
+                if (HistoryStore.RemoveCompletedRecord(row.Start, stop))
+                {
+                    UpdateTodayWorkTime();
+                    Dispatcher.BeginInvoke(new Action(() => RefreshHistory()));
+                }
+                else
+                {
+                    ShowHistoryError("The session could not be found in the history files.");
+                }
             }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or SecurityException)
+            {
+                ShowHistoryError($"The session could not be deleted: {ex.Message}");
+            }
+        }
+
+        private void HistoryDataGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+        {
+            if (e.Row.Item is HistoryRow { IsInProgress: true })
+            {
+                e.Cancel = true;
+                ShowHistoryError("The session that is currently running cannot be edited while it is being recorded.");
+            }
+        }
+
+        private void HistoryDataGrid_RowEditEnding(object sender, DataGridRowEditEndingEventArgs e)
+        {
+            if (e.EditAction != DataGridEditAction.Commit)
+            {
+                return;
+            }
+
+            if (e.Row.Item is not HistoryRow row || row.IsInProgress || row.Stop is not { } originalStop)
+            {
+                return;
+            }
+
+            if (!TryGetUpdatedInterval(row, out DateTimeOffset newStart, out DateTimeOffset newStop, out string error))
+            {
+                ShowHistoryError(error);
+                row.RestorePersistedText();
+                return;
+            }
+
+            if (newStart == row.Start && newStop == row.Stop)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!HistoryStore.ReplaceRecord(row.Start, originalStop, newStart, newStop))
+                {
+                    ShowHistoryError("The session could not be found in the history files.");
+                    row.RestorePersistedText();
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or SecurityException)
+            {
+                ShowHistoryError($"The session could not be saved: {ex.Message}");
+                row.RestorePersistedText();
+                return;
+            }
+
+            row.Start = newStart;
+            row.Stop = newStop;
+            UpdateTodayWorkTime();
+            Dispatcher.BeginInvoke(new Action(() => RefreshHistory(newStart)));
+        }
+
+        /// <summary>Parses the edited cell texts of a row into a new start/stop pair on the row's day.</summary>
+        private bool TryGetUpdatedInterval(HistoryRow row, out DateTimeOffset newStart, out DateTimeOffset newStop, out string error)
+        {
+            newStart = default;
+            newStop = default;
+
+            if (!TryParseTimeOfDay(row.StartText, out TimeSpan startTime) ||
+                !TryParseTimeOfDay(row.StopText, out TimeSpan stopTime))
+            {
+                error = "Enter times as HH:mm or HH:mm:ss, for example 08:30 or 08:30:15.";
+                return false;
+            }
+
+            newStart = new DateTimeOffset(row.Date + startTime);
+            newStop = new DateTimeOffset(row.Date + stopTime);
+
+            if (newStop <= newStart)
+            {
+                error = "Stopped must be after Started.";
+                return false;
+            }
+
+            if (newStop > DateTimeOffset.Now)
+            {
+                error = "Times cannot be in the future.";
+                return false;
+            }
+
+            error = "";
+            return true;
+        }
+
+        /// <summary>
+        /// Accepts clock times as HH:mm or HH:mm:ss. "24:00" means midnight at the end of the day.
+        /// </summary>
+        internal static bool TryParseTimeOfDay(string text, out TimeSpan timeOfDay)
+        {
+            timeOfDay = TimeSpan.Zero;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            text = text.Trim();
+
+            if (string.Equals(text, "24:00", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(text, "24:00:00", StringComparison.OrdinalIgnoreCase))
+            {
+                timeOfDay = TimeSpan.FromDays(1);
+                return true;
+            }
+
+            if (DateTime.TryParseExact(
+                    text,
+                    new[] { "HH:mm:ss", "H:m:s", "HH:mm", "H:m" },
+                    CultureInfo.CurrentCulture,
+                    DateTimeStyles.NoCurrentDateDefault,
+                    out DateTime parsed))
+            {
+                timeOfDay = parsed.TimeOfDay;
+                return true;
+            }
+
+            return false;
+        }
+
+        private void ShowHistoryError(string message)
+        {
+            HistoryErrorText.Text = message;
+            HistoryErrorText.Foreground = ErrorBrush;
+            HistoryErrorText.Visibility = Visibility.Visible;
+        }
+
+        private void AddSessionButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (WeekComboBox.SelectedItem is not WeekOption option ||
+                !HistoryStore.TryGetWeekStartFromId(option.Id, out DateTime weekStart))
+            {
+                return;
+            }
+
+            // A small day picker, so sessions can also be added to days that have no
+            // group in the table yet.
+            var dayMenu = new ContextMenu();
+            DateTime today = DateTime.Today;
+
+            for (int dayIndex = 0; dayIndex < 7; dayIndex++)
+            {
+                DateTime date = weekStart.AddDays(dayIndex);
+                string header = FormatDateLabel(date);
+                if (date == today)
+                {
+                    header += "  (today)";
+                }
+
+                DateTime captured = date;
+                var item = new MenuItem { Header = header };
+                item.Click += (clickSender, clickArgs) => AddSession(captured);
+                dayMenu.Items.Add(item);
+            }
+
+            if (sender is Button addButton)
+            {
+                dayMenu.PlacementTarget = addButton;
+            }
+
+            dayMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            dayMenu.IsOpen = true;
+        }
+
+        private void AddSessionForGroupButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement { Tag: CollectionViewGroup group })
+            {
+                foreach (object item in group.Items)
+                {
+                    if (item is HistoryRow row)
+                    {
+                        AddSession(row.Date);
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void AddSession(DateTime date)
+        {
+            DateTimeOffset start;
+            DateTimeOffset stop;
+
+            if (date == DateTime.Today)
+            {
+                // For today a session that ends now is the most useful starting point.
+                stop = DateTimeOffset.Now;
+                start = stop - TimeSpan.FromHours(1);
+            }
+            else
+            {
+                start = new DateTimeOffset(date.AddHours(9));
+                stop = new DateTimeOffset(date.AddHours(10));
+            }
+
+            try
+            {
+                HistoryStore.Append(start, stop);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or SecurityException)
+            {
+                ShowHistoryError($"The session could not be added: {ex.Message}");
+                return;
+            }
+
+            UpdateTodayWorkTime();
+            // The deferred refresh selects the new row and opens its first cell for editing.
+            Dispatcher.BeginInvoke(new Action(() => RefreshHistory(start)));
         }
 
         private void ArchiveHistoryButton_Click(object sender, RoutedEventArgs e)
@@ -573,7 +882,7 @@ namespace work_monitor
             }));
         }
 
-        private void RefreshHistory()
+        private void RefreshHistory(DateTimeOffset? selectStart = null)
         {
             string? selectedId = (WeekComboBox.SelectedItem as WeekOption)?.Id;
 
@@ -610,10 +919,10 @@ namespace work_monitor
                 _loadingHistory = false;
             }
 
-            LoadSelectedWeek();
+            LoadSelectedWeek(selectStart);
         }
 
-        private void LoadSelectedWeek()
+        private void LoadSelectedWeek(DateTimeOffset? selectStart = null)
         {
             var rows = new List<HistoryRow>();
             TimeSpan todayTotal = TimeSpan.Zero;
@@ -650,12 +959,14 @@ namespace work_monitor
                         }
 
                         rows.Add(new HistoryRow(
+                            day.Date,
                             dateLabel,
                             record.Start.LocalDateTime.ToString("HH:mm:ss"),
                             stop.LocalDateTime.ToString("HH:mm:ss"),
                             FormatDurationNoSeconds(duration),
                             record.Start,
-                            record.Stop));
+                            record.Stop,
+                            isInProgress: false));
                     }
                 }
             }
@@ -686,12 +997,14 @@ namespace work_monitor
                 }
 
                 rows.Add(new HistoryRow(
+                    sessionDay,
                     FormatDateLabel(sessionDay),
                     sessionStart.LocalDateTime.ToString("HH:mm:ss"),
                     "in progress",
                     FormatDurationNoSeconds(elapsed),
                     sessionStart,
-                    null));
+                    null,
+                    isInProgress: true));
             }
 
             // Append per-day totals to the group (date) labels.
@@ -709,10 +1022,15 @@ namespace work_monitor
                 }
             }
 
-            HistoryListView.ItemsSource = new ListCollectionView(rows)
+            HistoryDataGrid.ItemsSource = new ListCollectionView(rows)
             {
                 GroupDescriptions = { new PropertyGroupDescription(nameof(HistoryRow.DateLabel)) }
             };
+
+            if (selectStart is { } startToSelect)
+            {
+                SelectAndEditRow(rows, startToSelect);
+            }
 
             HistoryEmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             HistorySummaryText.Text = $"Today: {FormatDurationNoSeconds(todayTotal)}    Week total: {FormatDurationNoSeconds(weekTotal)}";
@@ -736,6 +1054,21 @@ namespace work_monitor
                 HistoryErrorText.Text = _historyRecorder.LastError;
                 HistoryErrorText.Visibility = Visibility.Visible;
             }
+        }
+
+        /// <summary>Selects the row of a newly added or edited record and opens its first cell for editing.</summary>
+        private void SelectAndEditRow(List<HistoryRow> rows, DateTimeOffset start)
+        {
+            HistoryRow? row = rows.FirstOrDefault(candidate => candidate.Start == start);
+            if (row is null)
+            {
+                return;
+            }
+
+            HistoryDataGrid.SelectedItem = row;
+            HistoryDataGrid.CurrentCell = new DataGridCellInfo(row, HistoryDataGrid.Columns[0]);
+            HistoryDataGrid.Focus();
+            HistoryDataGrid.BeginEdit();
         }
 
         private static bool IsInWeek(DateTimeOffset value, string weekId)
@@ -765,7 +1098,7 @@ namespace work_monitor
                 : $"{(int)value.TotalMinutes}m {value.Seconds:00}s";
         }
 
-        private static string FormatDurationNoSeconds(TimeSpan value)
+        internal static string FormatDurationNoSeconds(TimeSpan value)
         {
             if (value < TimeSpan.Zero)
             {
@@ -780,29 +1113,145 @@ namespace work_monitor
         }
     }
 
-    internal sealed class HistoryRow
+    /// <summary>
+    /// One row of the history table. The texts can be edited in place; the start and stop
+    /// properties keep the persisted values that identify the record in the store.
+    /// </summary>
+    internal sealed class HistoryRow : INotifyPropertyChanged, IEditableObject
     {
-        public HistoryRow(string dateLabel, string startText, string stopText, string durationText, DateTimeOffset start, DateTimeOffset? stop)
+        private string _startText;
+        private string _stopText;
+        private string _durationText;
+        private (string StartText, string StopText)? _editSnapshot;
+
+        public HistoryRow(DateTime date, string dateLabel, string startText, string stopText, string durationText, DateTimeOffset start, DateTimeOffset? stop, bool isInProgress)
         {
+            Date = date;
             DateLabel = dateLabel;
-            StartText = startText;
-            StopText = stopText;
-            DurationText = durationText;
+            _startText = startText;
+            _stopText = stopText;
+            _durationText = durationText;
             Start = start;
             Stop = stop;
+            IsInProgress = isInProgress;
         }
 
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        /// <summary>The local day this row belongs to.</summary>
+        public DateTime Date { get; }
+
+        /// <summary>The group header label, including the day total.</summary>
         public string DateLabel { get; set; }
 
-        public string StartText { get; }
+        /// <summary>The persisted start of the record. Updated after an edit is saved.</summary>
+        public DateTimeOffset Start { get; internal set; }
 
-        public string StopText { get; }
+        /// <summary>The persisted stop of the record. Updated after an edit is saved.</summary>
+        public DateTimeOffset? Stop { get; internal set; }
 
-        public string DurationText { get; }
+        /// <summary>True while the session is still running and cannot be edited.</summary>
+        public bool IsInProgress { get; }
 
-        public DateTimeOffset Start { get; }
+        public bool IsEditable => !IsInProgress;
 
-        public DateTimeOffset? Stop { get; }
+        public string StartText
+        {
+            get => _startText;
+            set
+            {
+                if (_startText != value)
+                {
+                    _startText = value;
+                    OnPropertyChanged(nameof(StartText));
+                    UpdateDuration();
+                }
+            }
+        }
+
+        public string StopText
+        {
+            get => _stopText;
+            set
+            {
+                if (_stopText != value)
+                {
+                    _stopText = value;
+                    OnPropertyChanged(nameof(StopText));
+                    UpdateDuration();
+                }
+            }
+        }
+
+        public string DurationText => _durationText;
+
+        /// <summary>
+        /// Restores the cell texts from the persisted start and stop, used after a rejected
+        /// edit.
+        /// </summary>
+        public void RestorePersistedText()
+        {
+            StartText = Start.LocalDateTime.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+            if (Stop is { } stop)
+            {
+                StopText = stop.LocalDateTime.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+            }
+        }
+
+        void IEditableObject.BeginEdit()
+        {
+            _editSnapshot ??= (_startText, _stopText);
+        }
+
+        void IEditableObject.CancelEdit()
+        {
+            if (_editSnapshot is { } snapshot)
+            {
+                _startText = snapshot.StartText;
+                _stopText = snapshot.StopText;
+                _editSnapshot = null;
+                OnPropertyChanged(nameof(StartText));
+                OnPropertyChanged(nameof(StopText));
+                UpdateDuration();
+            }
+        }
+
+        void IEditableObject.EndEdit()
+        {
+            _editSnapshot = null;
+        }
+
+        private void UpdateDuration()
+        {
+            string computed;
+
+            if (MainWindow.TryParseTimeOfDay(_startText, out TimeSpan startTime) &&
+                MainWindow.TryParseTimeOfDay(_stopText, out TimeSpan stopTime) &&
+                stopTime > startTime)
+            {
+                computed = MainWindow.FormatDurationNoSeconds(stopTime - startTime);
+            }
+            else if (Stop is { } stop)
+            {
+                // Half-finished or invalid cell texts keep showing the persisted duration.
+                computed = MainWindow.FormatDurationNoSeconds(stop - Start);
+            }
+            else
+            {
+                return;
+            }
+
+            if (_durationText != computed)
+            {
+                _durationText = computed;
+                OnPropertyChanged(nameof(DurationText));
+            }
+        }
+
+        private void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     internal sealed class WeekOption

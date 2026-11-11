@@ -93,17 +93,26 @@ namespace work_monitor
 
             lock (Gate)
             {
-                DateTimeOffset segmentStart = start;
+                AddInterval(start, stop);
+            }
+        }
 
-                while (segmentStart < stop)
-                {
-                    DateTimeOffset dayEnd = StartOfNextDay(segmentStart);
-                    DateTimeOffset segmentStop = dayEnd < stop ? dayEnd : stop;
+        /// <summary>
+        /// Adds an interval, split per day like <see cref="Append"/> does. The caller must hold
+        /// <see cref="Gate"/>.
+        /// </summary>
+        private static void AddInterval(DateTimeOffset start, DateTimeOffset stop)
+        {
+            DateTimeOffset segmentStart = start;
 
-                    AddSegment(segmentStart, segmentStop);
+            while (segmentStart < stop)
+            {
+                DateTimeOffset dayEnd = StartOfNextDay(segmentStart);
+                DateTimeOffset segmentStop = dayEnd < stop ? dayEnd : stop;
 
-                    segmentStart = segmentStop;
-                }
+                AddSegment(segmentStart, segmentStop);
+
+                segmentStart = segmentStop;
             }
         }
 
@@ -166,14 +175,14 @@ namespace work_monitor
         }
 
         /// <summary>
-        /// Deletes the completed record matching the given start and stop times. When both a
-        /// previous and a next record exist on the same day, they are merged into a single
-        /// session (previous start to next stop). Returns false when the record is not found or
-        /// is still in progress.
+        /// Replaces the completed record matching the given start and stop times with a new
+        /// interval. The new interval is split per day like <see cref="Append"/> does, so a
+        /// session that now crosses midnight ends up in the right day(s) and week files.
+        /// Returns false when the original record is not found.
         /// </summary>
-        public static bool DeleteRecord(DateTimeOffset start, DateTimeOffset stop)
+        public static bool ReplaceRecord(DateTimeOffset oldStart, DateTimeOffset oldStop, DateTimeOffset newStart, DateTimeOffset newStop)
         {
-            if (stop <= start)
+            if (newStop <= newStart)
             {
                 return false;
             }
@@ -190,25 +199,13 @@ namespace work_monitor
 
                     foreach (DayHistory day in week.Days)
                     {
-                        int index = day.Records.FindIndex(record => record.Start == start && record.Stop == stop);
+                        int index = day.Records.FindIndex(record => record.Start == oldStart && record.Stop == oldStop);
                         if (index < 0)
                         {
                             continue;
                         }
 
                         day.Records.RemoveAt(index);
-
-                        // Merge the neighbours into one session when both exist.
-                        if (index > 0 && index < day.Records.Count)
-                        {
-                            WorkRecord previous = day.Records[index - 1];
-                            WorkRecord next = day.Records[index];
-                            if (previous.Stop.HasValue)
-                            {
-                                previous.Stop = next.Stop;
-                                day.Records.RemoveAt(index);
-                            }
-                        }
 
                         // Drop empty days.
                         if (day.Records.Count == 0)
@@ -217,12 +214,40 @@ namespace work_monitor
                         }
 
                         SaveWeekFile(weekId, week);
+                        AddInterval(newStart, newStop);
                         return true;
                     }
                 }
 
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Parses a week id like <c>2026-W44</c> back into the Monday that starts it. Returns
+        /// false for ids that are not in the expected format or do not round-trip.
+        /// </summary>
+        public static bool TryGetWeekStartFromId(string weekId, out DateTime weekStart)
+        {
+            weekStart = default;
+
+            if (weekId.Length != 8 || weekId[4] != '-' || weekId[5] != 'W' ||
+                !int.TryParse(weekId.Substring(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out int year) ||
+                !int.TryParse(weekId.Substring(6, 2), NumberStyles.None, CultureInfo.InvariantCulture, out int week))
+            {
+                return false;
+            }
+
+            if (year < 1 || week < 1 || week > 53)
+            {
+                return false;
+            }
+
+            // 4 January always falls into ISO week 1, so its Monday starts week 1.
+            DateTime firstWeekStart = GetWeekStart(new DateTime(year, 1, 4));
+            weekStart = firstWeekStart.AddDays((week - 1) * 7);
+
+            return string.Equals(GetWeekId(weekStart), weekId, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Creates the history folder and opens it in Explorer.</summary>
