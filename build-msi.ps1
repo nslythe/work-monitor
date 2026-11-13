@@ -54,6 +54,11 @@ if (-not $Version) {
     }
 }
 
+# Release tags are sometimes prefixed with "v" (for example v1.0.1).
+if ($Version -match '^[vV](\d+\.\d+\.\d+)$') {
+    $Version = $Matches[1]
+}
+
 if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     throw "The MSI version must have the form major.minor.build (for example 1.0.1), not '$Version'."
 }

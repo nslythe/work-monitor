@@ -172,6 +172,36 @@
 
                         <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
 
+                        <TextBlock Text="Updates"
+                                   Margin="0,20,0,0"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="#1F2933" />
+                        <TextBlock x:Name="UpdateVersionText"
+                                   Margin="0,6,0,0"
+                                   FontSize="12"
+                                   Foreground="#616E7C" />
+                        <TextBlock Text="Work Monitor checks GitHub for a newer release when it starts and every six hours. When one is found, you can choose whether to install it."
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="#616E7C" />
+                        <Button x:Name="CheckForUpdatesButton"
+                                Content="Check for updates"
+                                Click="CheckForUpdatesButton_Click"
+                                HorizontalAlignment="Left"
+                                Margin="0,12,0,0"
+                                Padding="16,7"
+                                FontSize="13" />
+                        <TextBlock x:Name="UpdateStatusText"
+                                   Margin="0,10,0,0"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="#616E7C"
+                                   Visibility="Collapsed" />
+
+                        <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+
                         <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
                             <Button x:Name="ApplyButton"
                                     Content="Apply"

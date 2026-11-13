@@ -31,9 +31,17 @@ jobs:
         dotnet-version: '8.0.x'
 
     # Builds "work monitor.sln" in Release, then packages dist/WorkMonitor-<version>-x64.msi.
+    # On a release the tag is the version, so the MSI and the application match the release.
     - name: Build Release and MSI
       shell: pwsh
-      run: .\build-msi.ps1
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+      run: |
+        if ($env:GITHUB_EVENT_NAME -eq 'release') {
+          .\build-msi.ps1 -Version $env:RELEASE_TAG
+        } else {
+          .\build-msi.ps1
+        }
 
     - name: Upload MSI artifact
       uses: actions/upload-artifact@v4

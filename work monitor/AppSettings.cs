@@ -15,6 +15,15 @@ namespace work_monitor
         /// <summary>Minutes without mouse movement before the state becomes Not working.</summary>
         public int IdleTimeoutMinutes { get; set; } = DefaultIdleTimeoutMinutes;
 
+        /// <summary>Release version the user asked to skip, so it is not offered again.</summary>
+        public string? SkippedUpdateVersion { get; set; }
+
+        /// <summary>UTC time of the most recent update check, whether it succeeded or not.</summary>
+        public DateTime? LastUpdateCheckUtc { get; set; }
+
+        /// <summary>UTC time before which no update prompt is shown again.</summary>
+        public DateTime? UpdateSnoozeUntilUtc { get; set; }
+
         [JsonIgnore]
         public TimeSpan IdleTimeout => TimeSpan.FromMinutes(IdleTimeoutMinutes);
 

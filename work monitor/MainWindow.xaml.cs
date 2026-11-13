@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
-using System.Reflection;
 using System.IO;
 using System.IO.Compression;
+using System.Net.Http;
 using System.Security;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -25,16 +27,23 @@ namespace work_monitor
 
         private static readonly Brush SuccessBrush = new SolidColorBrush(Color.FromRgb(0x1B, 0x7F, 0x3B));
         private static readonly Brush ErrorBrush = new SolidColorBrush(Color.FromRgb(0xB3, 0x26, 0x1E));
+        private static readonly Brush MutedBrush = new SolidColorBrush(Color.FromRgb(0x61, 0x6E, 0x7C));
+
+        private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(6);
+        private static readonly TimeSpan UpdateSnoozeInterval = TimeSpan.FromHours(24);
 
         private readonly AppSettings _settings;
         private readonly MouseActivityMonitor _monitor;
         private readonly WorkSessionRecorder _historyRecorder;
         private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private readonly DispatcherTimer _copyFeedbackTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
+        private readonly DispatcherTimer _copyFeedbackTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
+        private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromHours(6) };
         private readonly TrayIcon _trayIcon;
 
         private bool _loadingHistory;
         private bool _allowClose;
+        private bool _checkingForUpdates;
+        private bool _updatePromptOpen;
         private string? _rightClickedTimeText;
 
         public MainWindow()
@@ -45,7 +54,8 @@ namespace work_monitor
 
             InitializeComponent();
 
-            VersionText.Text = $"Version {Assembly.GetExecutingAssembly().GetName().Version}";
+            VersionText.Text = $"Version {UpdateService.CurrentVersionText}";
+            UpdateVersionText.Text = $"Installed version {UpdateService.CurrentVersionText}";
 
             _trayIcon = new TrayIcon(_monitor.State);
             _trayIcon.OpenRequested += TrayIcon_OpenRequested;
@@ -57,6 +67,7 @@ namespace work_monitor
 
             _refreshTimer.Tick += RefreshTimer_Tick;
             _copyFeedbackTimer.Tick += CopyFeedbackTimer_Tick;
+            _updateTimer.Tick += UpdateTimer_Tick;
             _monitor.StateChanged += Monitor_StateChanged;
             _historyRecorder.HistoryChanged += HistoryRecorder_HistoryChanged;
 
@@ -73,6 +84,9 @@ namespace work_monitor
             UpdateActivityInfo();
             RefreshHistory();
             _refreshTimer.Start();
+
+            _updateTimer.Start();
+            _ = CheckForUpdatesAsync(manual: false);
         }
 
         private void Window_Closing(object? sender, CancelEventArgs e)
@@ -92,6 +106,9 @@ namespace work_monitor
         {
             _refreshTimer.Stop();
             _refreshTimer.Tick -= RefreshTimer_Tick;
+
+            _updateTimer.Stop();
+            _updateTimer.Tick -= UpdateTimer_Tick;
 
             _trayIcon.Dispose();
 
@@ -158,6 +175,210 @@ namespace work_monitor
         private void RefreshTimer_Tick(object? sender, EventArgs e)
         {
             UpdateActivityInfo();
+        }
+
+        private void UpdateTimer_Tick(object? sender, EventArgs e)
+        {
+            _ = CheckForUpdatesAsync(manual: false);
+        }
+
+        private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
+        {
+            await CheckForUpdatesAsync(manual: true);
+        }
+
+        /// <summary>
+        /// Checks GitHub for a newer release. Automatic checks are throttled and stay silent on
+        /// failure; a manual check always runs and reports its result in the Settings tab.
+        /// </summary>
+        private async Task CheckForUpdatesAsync(bool manual)
+        {
+            if (_checkingForUpdates || _updatePromptOpen || Dispatcher.HasShutdownStarted)
+            {
+                return;
+            }
+
+            if (!manual && !IsAutomaticUpdateCheckDue())
+            {
+                return;
+            }
+
+            _checkingForUpdates = true;
+
+            if (manual)
+            {
+                CheckForUpdatesButton.IsEnabled = false;
+                ShowUpdateStatus("Checking for updates...", isError: false);
+            }
+
+            UpdateInfo? update = null;
+            string? error = null;
+
+            try
+            {
+                update = await UpdateService.GetLatestReleaseAsync(CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or IOException or InvalidOperationException or NotSupportedException)
+            {
+                error = ex.Message;
+            }
+            finally
+            {
+                _checkingForUpdates = false;
+
+                if (manual)
+                {
+                    CheckForUpdatesButton.IsEnabled = true;
+                }
+            }
+
+            if (Dispatcher.HasShutdownStarted || !IsLoaded)
+            {
+                return;
+            }
+
+            _settings.LastUpdateCheckUtc = DateTime.UtcNow;
+            TrySaveSettings();
+
+            if (error is not null)
+            {
+                if (manual)
+                {
+                    ShowUpdateStatus($"Could not check for updates: {error}", isError: true);
+                }
+
+                return;
+            }
+
+            if (update is null)
+            {
+                if (manual)
+                {
+                    ShowUpdateStatus("No published releases were found.", isError: false);
+                }
+
+                return;
+            }
+
+            if (!UpdateService.IsNewer(update.Version, UpdateService.CurrentVersion))
+            {
+                if (manual)
+                {
+                    ShowUpdateStatus($"You're up to date (version {UpdateService.CurrentVersionText}).", isError: false);
+                }
+
+                return;
+            }
+
+            if (manual)
+            {
+                ShowUpdateStatus($"Version {update.VersionText} is available.", isError: false);
+            }
+
+            if (!manual && !ShouldPromptForUpdate(update))
+            {
+                return;
+            }
+
+            ShowUpdatePrompt(update);
+        }
+
+        private bool IsAutomaticUpdateCheckDue()
+        {
+            if (_settings.LastUpdateCheckUtc is not { } lastCheck)
+            {
+                return true;
+            }
+
+            DateTime now = DateTime.UtcNow;
+
+            // A clock change must not postpone checks indefinitely.
+            return lastCheck > now || now - lastCheck >= UpdateCheckInterval;
+        }
+
+        private bool ShouldPromptForUpdate(UpdateInfo update)
+        {
+            if (string.Equals(_settings.SkippedUpdateVersion, update.VersionText, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (_settings.UpdateSnoozeUntilUtc is { } snoozeUntil && snoozeUntil > DateTime.UtcNow)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private void ShowUpdatePrompt(UpdateInfo update)
+        {
+            _updatePromptOpen = true;
+
+            try
+            {
+                if (!IsVisible || WindowState == WindowState.Minimized)
+                {
+                    ShowFromTray();
+                }
+
+                var dialog = new UpdateDialog(update) { Owner = this };
+                bool? result = dialog.ShowDialog();
+
+                if (result == true && dialog.DownloadedInstallerPath is { } installerPath)
+                {
+                    if (UpdateService.TryLaunchInstaller(installerPath, out string? error))
+                    {
+                        // The installer replaces this executable, so exit after flushing the
+                        // running session to history. Its finish page can start the new version.
+                        PrepareForShutdown();
+                    }
+                    else
+                    {
+                        MessageBox.Show(
+                            this,
+                            $"The update installer could not be started: {error}",
+                            "Update Work Monitor",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                }
+                else if (dialog.SkipRequested)
+                {
+                    _settings.SkippedUpdateVersion = update.VersionText;
+                    TrySaveSettings();
+                    ShowUpdateStatus($"Version {update.VersionText} will be skipped.", isError: false);
+                }
+                else if (dialog.SnoozeRequested)
+                {
+                    _settings.UpdateSnoozeUntilUtc = DateTime.UtcNow.Add(UpdateSnoozeInterval);
+                    TrySaveSettings();
+                    ShowUpdateStatus($"Version {update.VersionText} will be offered again later.", isError: false);
+                }
+            }
+            finally
+            {
+                _updatePromptOpen = false;
+            }
+        }
+
+        private void ShowUpdateStatus(string message, bool isError)
+        {
+            UpdateStatusText.Text = message;
+            UpdateStatusText.Foreground = isError ? ErrorBrush : MutedBrush;
+            UpdateStatusText.Visibility = Visibility.Visible;
+        }
+
+        private void TrySaveSettings()
+        {
+            try
+            {
+                SettingsStore.Save(_settings);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or SecurityException)
+            {
+                // Remembering the check time and the user's update choice is best effort.
+            }
         }
 
         /// <summary>

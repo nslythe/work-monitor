@@ -24,6 +24,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
 
   <ItemGroup>
