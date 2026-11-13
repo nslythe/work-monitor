@@ -62,7 +62,7 @@ namespace work_monitor
 
             if (!_update.HasInstaller)
             {
-                UpdateService.OpenReleasePage(_update.ReleasePageUrl);
+                UpdateService.OpenUrl(_update.ReleasePageUrl);
                 SnoozeRequested = true;
                 _resolved = true;
                 DialogResult = false;
@@ -139,7 +139,7 @@ namespace work_monitor
 
         private void ViewReleaseButton_Click(object sender, RoutedEventArgs e)
         {
-            UpdateService.OpenReleasePage(_update.ReleasePageUrl);
+            UpdateService.OpenUrl(_update.ReleasePageUrl);
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)

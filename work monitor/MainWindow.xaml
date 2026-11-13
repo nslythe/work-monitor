@@ -202,6 +202,25 @@
 
                         <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
 
+                        <TextBlock Text="About"
+                                   Margin="0,20,0,0"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="#1F2933" />
+                        <TextBlock Text="Work Monitor is open source. Report issues, request features, or read the source code on GitHub."
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="#616E7C" />
+                        <TextBlock Margin="0,8,0,0" FontSize="14">
+                            <Hyperlink NavigateUri="https://github.com/nslythe/work-monitor"
+                                       RequestNavigate="ProjectLink_RequestNavigate">
+                                View the project on GitHub
+                            </Hyperlink>
+                        </TextBlock>
+
+                        <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+
                         <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
                             <Button x:Name="ApplyButton"
                                     Content="Apply"

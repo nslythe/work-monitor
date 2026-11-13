@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Navigation;
 using System.Windows.Threading;
 using Newtonsoft.Json;
 
@@ -185,6 +186,12 @@ namespace work_monitor
         private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
         {
             await CheckForUpdatesAsync(manual: true);
+        }
+
+        private void ProjectLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            UpdateService.OpenUrl(UpdateService.RepositoryUrl);
+            e.Handled = true;
         }
 
         /// <summary>

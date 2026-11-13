@@ -70,11 +70,13 @@ namespace work_monitor
         private const string RepositoryOwner = "nslythe";
         private const string RepositoryName = "work-monitor";
 
+        /// <summary>The public GitHub page of the Work Monitor project.</summary>
+        public const string RepositoryUrl = $"https://github.com/{RepositoryOwner}/{RepositoryName}";
+
         private static readonly Uri LatestReleaseUri =
             new($"https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases/latest");
 
-        private static readonly Uri ReleasesPageUri =
-            new($"https://github.com/{RepositoryOwner}/{RepositoryName}/releases");
+        private static readonly Uri ReleasesPageUri = new($"{RepositoryUrl}/releases");
 
         private static readonly Lazy<Version> LazyCurrentVersion = new(() =>
             NormalizeVersion(Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0)));
@@ -390,8 +392,8 @@ namespace work_monitor
             }
         }
 
-        /// <summary>Opens the release page in the default browser.</summary>
-        public static void OpenReleasePage(string url)
+        /// <summary>Opens a URL in the default browser.</summary>
+        public static void OpenUrl(string url)
         {
             try
             {
