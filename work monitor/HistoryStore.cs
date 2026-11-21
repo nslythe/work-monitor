@@ -86,6 +86,15 @@ namespace work_monitor
         /// </summary>
         public static void Append(DateTimeOffset start, DateTimeOffset stop)
         {
+            Append(start, stop, note: null);
+        }
+
+        /// <summary>
+        /// Adds a work interval with an optional note. The note is copied to every segment when
+        /// the interval is split across days.
+        /// </summary>
+        public static void Append(DateTimeOffset start, DateTimeOffset stop, string? note)
+        {
             if (stop <= start)
             {
                 return;
@@ -93,15 +102,15 @@ namespace work_monitor
 
             lock (Gate)
             {
-                AddInterval(start, stop);
+                AddInterval(start, stop, note);
             }
         }
 
         /// <summary>
-        /// Adds an interval, split per day like <see cref="Append"/> does. The caller must hold
-        /// <see cref="Gate"/>.
+        /// Adds an interval, split per day like <see cref="Append(DateTimeOffset, DateTimeOffset, string?)"/> does.
+        /// The caller must hold <see cref="Gate"/>.
         /// </summary>
-        private static void AddInterval(DateTimeOffset start, DateTimeOffset stop)
+        private static void AddInterval(DateTimeOffset start, DateTimeOffset stop, string? note)
         {
             DateTimeOffset segmentStart = start;
 
@@ -110,7 +119,7 @@ namespace work_monitor
                 DateTimeOffset dayEnd = StartOfNextDay(segmentStart);
                 DateTimeOffset segmentStop = dayEnd < stop ? dayEnd : stop;
 
-                AddSegment(segmentStart, segmentStop);
+                AddSegment(segmentStart, segmentStop, note);
 
                 segmentStart = segmentStop;
             }
@@ -180,7 +189,7 @@ namespace work_monitor
         /// session that now crosses midnight ends up in the right day(s) and week files.
         /// Returns false when the original record is not found.
         /// </summary>
-        public static bool ReplaceRecord(DateTimeOffset oldStart, DateTimeOffset oldStop, DateTimeOffset newStart, DateTimeOffset newStop)
+        public static bool ReplaceRecord(DateTimeOffset oldStart, DateTimeOffset oldStop, DateTimeOffset newStart, DateTimeOffset newStop, string? note)
         {
             if (newStop <= newStart)
             {
@@ -214,13 +223,107 @@ namespace work_monitor
                         }
 
                         SaveWeekFile(weekId, week);
-                        AddInterval(newStart, newStop);
+                        AddInterval(newStart, newStop, note);
                         return true;
                     }
                 }
 
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Sets the note on every segment of the session that starts at <paramref name="start"/>.
+        /// Segments of a session that crosses midnight are linked by matching start/stop times,
+        /// so they all get the same note. Returns false when no matching record is found.
+        /// </summary>
+        public static bool SetNote(DateTimeOffset start, string? note)
+        {
+            string? storedNote = NormalizeNote(note);
+
+            lock (Gate)
+            {
+                var files = new List<(string WeekId, WeekHistory Week)>();
+                foreach (string weekId in ListWeeks())
+                {
+                    if (LoadWeekFile(weekId) is { } week)
+                    {
+                        files.Add((weekId, week));
+                    }
+                }
+
+                List<WorkRecord> allRecords = files
+                    .SelectMany(file => file.Week.Days)
+                    .SelectMany(day => day.Records)
+                    .ToList();
+
+                WorkRecord? seed = allRecords.FirstOrDefault(record => record.Start == start);
+                if (seed is null)
+                {
+                    return false;
+                }
+
+                // Follow the chain of midnight-split segments in both directions.
+                var sessionRecords = new List<WorkRecord> { seed };
+                ExtendChain(sessionRecords, allRecords, forward: true);
+                ExtendChain(sessionRecords, allRecords, forward: false);
+
+                var changedWeeks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach ((string weekId, WeekHistory week) in files)
+                {
+                    foreach (WorkRecord record in week.Days.SelectMany(day => day.Records))
+                    {
+                        if (!sessionRecords.Contains(record))
+                        {
+                            continue;
+                        }
+
+                        record.Note = storedNote;
+                        changedWeeks.Add(weekId);
+                    }
+                }
+
+                foreach (string weekId in changedWeeks)
+                {
+                    SaveWeekFile(weekId, files.First(file => file.WeekId == weekId).Week);
+                }
+
+                return changedWeeks.Count > 0;
+            }
+        }
+
+        /// <summary>Walks forward or backward from the records already found, adding linked segments.</summary>
+        private static void ExtendChain(List<WorkRecord> found, List<WorkRecord> allRecords, bool forward)
+        {
+            while (true)
+            {
+                WorkRecord current = forward ? found[found.Count - 1] : found[0];
+                DateTimeOffset boundary = forward ? current.Stop ?? DateTimeOffset.MinValue : current.Start;
+                WorkRecord? next = allRecords.FirstOrDefault(record =>
+                    !found.Contains(record) &&
+                    (forward
+                        ? record.Start == boundary && record.Stop > boundary
+                        : record.Stop == boundary && record.Start < boundary));
+
+                if (next is null)
+                {
+                    return;
+                }
+
+                if (forward)
+                {
+                    found.Add(next);
+                }
+                else
+                {
+                    found.Insert(0, next);
+                }
+            }
+        }
+
+        private static string? NormalizeNote(string? note)
+        {
+            return string.IsNullOrWhiteSpace(note) ? null : note;
         }
 
         /// <summary>
@@ -257,7 +360,7 @@ namespace work_monitor
             Process.Start(new ProcessStartInfo(HistoryDirectory) { UseShellExecute = true });
         }
 
-        private static void AddSegment(DateTimeOffset start, DateTimeOffset stop)
+        private static void AddSegment(DateTimeOffset start, DateTimeOffset stop, string? note)
         {
             DateTime date = start.DateTime.Date;
             DateTime weekStart = GetWeekStart(date);
@@ -273,7 +376,7 @@ namespace work_monitor
                 history.Days.Sort((left, right) => left.Date.CompareTo(right.Date));
             }
 
-            day.Records.Add(new WorkRecord { Start = start, Stop = stop });
+            day.Records.Add(new WorkRecord { Start = start, Stop = stop, Note = NormalizeNote(note) });
             day.Records.Sort((left, right) => left.Start.CompareTo(right.Start));
 
             SaveWeekFile(weekId, history);

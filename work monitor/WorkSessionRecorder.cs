@@ -16,10 +16,14 @@ namespace work_monitor
         private readonly object _gate = new();
 
         private DateTimeOffset? _sessionStart;
+        private string? _sessionNote;
         private bool _disposed;
 
         /// <summary>Raised after a session starts, ends or fails to save. Invoked on the monitor thread.</summary>
         public event EventHandler? HistoryChanged;
+
+        /// <summary>Raised when the note of the running session changes.</summary>
+        public event EventHandler? CurrentSessionNoteChanged;
 
         public WorkSessionRecorder(MouseActivityMonitor monitor)
         {
@@ -40,8 +44,43 @@ namespace work_monitor
             }
         }
 
+        /// <summary>Note for the session that is still running, or <c>null</c> when idle.</summary>
+        public string? CurrentSessionNote
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _sessionNote;
+                }
+            }
+            set
+            {
+                string? note = NormalizeNote(value);
+                bool changed;
+
+                lock (_gate)
+                {
+                    changed = !string.Equals(_sessionNote, note, StringComparison.Ordinal);
+                    if (!changed)
+                    {
+                        return;
+                    }
+
+                    _sessionNote = note;
+                }
+
+                CurrentSessionNoteChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
         /// <summary>Message of the last failed history write, or <c>null</c> when all writes succeeded.</summary>
         public string? LastError { get; private set; }
+
+        private static string? NormalizeNote(string? note)
+        {
+            return string.IsNullOrWhiteSpace(note) ? null : note;
+        }
 
         /// <summary>
         /// Saves the session that is still running at its last activity time. Called when the
@@ -49,14 +88,23 @@ namespace work_monitor
         /// </summary>
         public void Flush()
         {
+            bool noteCleared = false;
+
             lock (_gate)
             {
                 if (_sessionStart is { } start)
                 {
                     _sessionStart = null;
 
-                    Write(start, ToLocal(_monitor.LastActivityUtc));
+                    Write(start, ToLocal(_monitor.LastActivityUtc), _sessionNote);
+                    noteCleared = _sessionNote is not null;
+                    _sessionNote = null;
                 }
+            }
+
+            if (noteCleared)
+            {
+                CurrentSessionNoteChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -68,12 +116,15 @@ namespace work_monitor
         private void Monitor_ActivityDetected(object? sender, EventArgs e)
         {
             bool started = false;
+            bool noteCleared = false;
 
             lock (_gate)
             {
                 if (_sessionStart is null)
                 {
                     _sessionStart = ToLocal(_monitor.LastActivityUtc);
+                    noteCleared = _sessionNote is not null;
+                    _sessionNote = null;
                     started = true;
                 }
             }
@@ -81,12 +132,17 @@ namespace work_monitor
             if (started)
             {
                 HistoryChanged?.Invoke(this, EventArgs.Empty);
+                if (noteCleared)
+                {
+                    CurrentSessionNoteChanged?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
 
         private void Monitor_StateChanged(object? sender, WorkStateChangedEventArgs e)
         {
             bool changed = false;
+            bool noteChanged = false;
 
             lock (_gate)
             {
@@ -96,6 +152,8 @@ namespace work_monitor
                         if (_sessionStart is null)
                         {
                             _sessionStart = ToLocal(e.LastActivityUtc);
+                            noteChanged = _sessionNote is not null;
+                            _sessionNote = null;
                             changed = true;
                         }
 
@@ -109,7 +167,9 @@ namespace work_monitor
                             // Use the monitor's timestamp: while activity is continuous no state
                             // transitions are raised, so the event's timestamp can be older than
                             // the actual last activity.
-                            Write(start, ToLocal(_monitor.LastActivityUtc));
+                            Write(start, ToLocal(_monitor.LastActivityUtc), _sessionNote);
+                            noteChanged = _sessionNote is not null;
+                            _sessionNote = null;
                             changed = true;
                         }
 
@@ -120,10 +180,14 @@ namespace work_monitor
             if (changed)
             {
                 HistoryChanged?.Invoke(this, EventArgs.Empty);
+                if (noteChanged)
+                {
+                    CurrentSessionNoteChanged?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
 
-        private void Write(DateTimeOffset start, DateTimeOffset stop)
+        private void Write(DateTimeOffset start, DateTimeOffset stop, string? note)
         {
             if (stop <= start)
             {
@@ -132,7 +196,7 @@ namespace work_monitor
 
             try
             {
-                HistoryStore.Append(start, stop);
+                HistoryStore.Append(start, stop, note);
                 LastError = null;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or SecurityException)
@@ -156,6 +220,7 @@ namespace work_monitor
         public void ResumeLastSessionIfNeeded()
         {
             bool changed = false;
+            bool noteRestored = false;
 
             lock (_gate)
             {
@@ -179,12 +244,18 @@ namespace work_monitor
 
                 HistoryStore.RemoveCompletedRecord(last.Start, last.Stop.Value);
                 _sessionStart = last.Start;
+                _sessionNote = NormalizeNote(last.Note);
+                noteRestored = _sessionNote is not null;
                 changed = true;
             }
 
             if (changed)
             {
                 HistoryChanged?.Invoke(this, EventArgs.Empty);
+                if (noteRestored)
+                {
+                    CurrentSessionNoteChanged?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
 

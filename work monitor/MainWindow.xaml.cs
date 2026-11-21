@@ -42,6 +42,9 @@ namespace work_monitor
         private readonly TrayIcon _trayIcon;
 
         private bool _loadingHistory;
+        private bool _finishingStatusNoteEdit;
+        private bool _statusEditorWasOpenOnPress;
+        private bool _discardingNoteEdit;
         private bool _allowClose;
         private bool _checkingForUpdates;
         private bool _updatePromptOpen;
@@ -71,6 +74,7 @@ namespace work_monitor
             _updateTimer.Tick += UpdateTimer_Tick;
             _monitor.StateChanged += Monitor_StateChanged;
             _historyRecorder.HistoryChanged += HistoryRecorder_HistoryChanged;
+            _historyRecorder.CurrentSessionNoteChanged += HistoryRecorder_CurrentSessionNoteChanged;
 
             TimeoutTextBox.Text = _settings.IdleTimeoutMinutes.ToString(CultureInfo.InvariantCulture);
             StartWithWindowsCheckBox.IsChecked = TryGetStartupEnabled();
@@ -83,6 +87,7 @@ namespace work_monitor
             _historyRecorder.ResumeLastSessionIfNeeded();
             UpdateStatus(_monitor.State, _monitor.LastActivitySource);
             UpdateActivityInfo();
+            UpdateStatusNote();
             RefreshHistory();
             _refreshTimer.Start();
 
@@ -117,6 +122,7 @@ namespace work_monitor
             _monitor.Dispose();
 
             _historyRecorder.HistoryChanged -= HistoryRecorder_HistoryChanged;
+            _historyRecorder.CurrentSessionNoteChanged -= HistoryRecorder_CurrentSessionNoteChanged;
             _historyRecorder.Dispose();
         }
 
@@ -519,6 +525,184 @@ namespace work_monitor
                 "application restarts, including after a reboot, while the timeout has not passed.";
         }
 
+        /// <summary>
+        /// Called when the note of the running session changes from either view. Recorder events
+        /// may come from the monitor thread, so the UI update is marshalled to the dispatcher.
+        /// </summary>
+        private void HistoryRecorder_CurrentSessionNoteChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.HasShutdownStarted)
+            {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!IsLoaded)
+                {
+                    return;
+                }
+
+                UpdateStatusNote();
+
+                if (_historyRecorder.CurrentSessionStart is { } start)
+                {
+                    UpdateHistoryNoteCell(start, _historyRecorder.CurrentSessionNote);
+                }
+            }));
+        }
+
+        private void StatusCard_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // Remember the state at press time: a press inside the card can close the editor
+            // through LostFocus before MouseLeftButtonUp runs, so the click must not reopen it.
+            _statusEditorWasOpenOnPress = StatusNoteEditTextBox.Visibility == Visibility.Visible;
+        }
+
+        private void StatusCard_Click(object sender, RoutedEventArgs e)
+        {
+            if (_statusEditorWasOpenOnPress)
+            {
+                return;
+            }
+
+            StartStatusNoteEdit();
+        }
+
+        private void StatusCard_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key is System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space)
+            {
+                e.Handled = true;
+                StartStatusNoteEdit();
+            }
+        }
+
+        private void StartStatusNoteEdit()
+        {
+            if (_historyRecorder.CurrentSessionStart is null ||
+                StatusNoteEditTextBox.Visibility == Visibility.Visible)
+            {
+                return;
+            }
+
+            StatusNoteEditTextBox.Text = _historyRecorder.CurrentSessionNote ?? string.Empty;
+            StatusDisplayPanel.Visibility = Visibility.Collapsed;
+            StatusNoteEditTextBox.Visibility = Visibility.Visible;
+            StatusNoteEditTextBox.Focus();
+            StatusNoteEditTextBox.CaretIndex = StatusNoteEditTextBox.Text.Length;
+        }
+
+        private void StatusNoteEditTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_finishingStatusNoteEdit || _historyRecorder.CurrentSessionStart is null)
+            {
+                return;
+            }
+
+            // Keep the recorder current so a session ending mid-edit writes the visible text.
+            _historyRecorder.CurrentSessionNote = StatusNoteEditTextBox.Text;
+        }
+
+        private void StatusNoteEditTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                e.Handled = true;
+                FinishStatusNoteEdit();
+            }
+        }
+
+        private void StatusNoteEditTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            FinishStatusNoteEdit();
+        }
+
+        private void FinishStatusNoteEdit()
+        {
+            if (_finishingStatusNoteEdit || StatusNoteEditTextBox.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            _finishingStatusNoteEdit = true;
+            try
+            {
+                string text = StatusNoteEditTextBox.Text;
+
+                if (_historyRecorder.CurrentSessionStart is { } start)
+                {
+                    _historyRecorder.CurrentSessionNote = text;
+                    UpdateHistoryNoteCell(start, text);
+                }
+                else if (!string.IsNullOrWhiteSpace(text))
+                {
+                    // The session ended while the editor was open; save to its finished record.
+                    try
+                    {
+                        WorkRecord? last = HistoryStore.GetLastCompletedRecord();
+                        if (last is not null && HistoryStore.SetNote(last.Start, text))
+                        {
+                            UpdateHistoryNoteCell(last.Start, text, updatePersisted: true);
+                        }
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or SecurityException)
+                    {
+                        // Note saving is best effort, like the recorder's own history writes.
+                    }
+                }
+
+                StatusNoteEditTextBox.Visibility = Visibility.Collapsed;
+                StatusDisplayPanel.Visibility = Visibility.Visible;
+                UpdateStatusNote();
+            }
+            finally
+            {
+                _finishingStatusNoteEdit = false;
+            }
+        }
+
+        private void UpdateStatusNote()
+        {
+            if (_historyRecorder.CurrentSessionStart is null &&
+                StatusNoteEditTextBox.Visibility == Visibility.Visible)
+            {
+                FinishStatusNoteEdit();
+                return;
+            }
+
+            string? note = _historyRecorder.CurrentSessionNote;
+            if (string.IsNullOrWhiteSpace(note))
+            {
+                StatusNoteText.Text = string.Empty;
+                StatusNoteText.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                StatusNoteText.Text = note;
+                StatusNoteText.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void UpdateHistoryNoteCell(DateTimeOffset start, string? note, bool updatePersisted = false)
+        {
+            foreach (object item in HistoryDataGrid.Items)
+            {
+                if (item is not HistoryRow row || row.Start != start)
+                {
+                    continue;
+                }
+
+                row.NoteText = note ?? string.Empty;
+                if (updatePersisted)
+                {
+                    row.PersistedNoteText = row.NoteText;
+                }
+
+                return;
+            }
+        }
+
         private void TimeoutTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             bool isValid = IsTimeoutTextValid();
@@ -778,6 +962,25 @@ namespace work_monitor
 
         private void HistoryDataGrid_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
+            // Esc while editing a note asks before throwing away the change.
+            if (e.Key == System.Windows.Input.Key.Escape &&
+                e.OriginalSource is TextBox noteTextBox &&
+                ReferenceEquals(HistoryDataGrid.CurrentCell.Column, NoteColumn) &&
+                noteTextBox.DataContext is HistoryRow noteRow)
+            {
+                string editedNote = noteTextBox.Text;
+                e.Handled = true;
+
+                // Close the editor before prompting, so the modal dialog cannot trigger a
+                // LostFocus save or a focus-loss commit while the answer is pending.
+                _discardingNoteEdit = true;
+                HistoryDataGrid.CancelEdit(DataGridEditingUnit.Row);
+                _discardingNoteEdit = false;
+
+                ConfirmNoteChange(noteRow, editedNote);
+                return;
+            }
+
             // While a cell is being edited, Delete edits text like in any other text box.
             if (e.Key != System.Windows.Input.Key.Delete || e.OriginalSource is TextBox)
             {
@@ -829,7 +1032,7 @@ namespace work_monitor
 
         private void HistoryDataGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
         {
-            if (e.Row.Item is HistoryRow { IsInProgress: true })
+            if (e.Row.Item is HistoryRow { IsInProgress: true } && !ReferenceEquals(e.Column, NoteColumn))
             {
                 e.Cancel = true;
                 ShowHistoryError("The session that is currently running cannot be edited while it is being recorded.");
@@ -843,7 +1046,21 @@ namespace work_monitor
                 return;
             }
 
-            if (e.Row.Item is not HistoryRow row || row.IsInProgress || row.Stop is not { } originalStop)
+            if (e.Row.Item is not HistoryRow row)
+            {
+                return;
+            }
+
+            string note = row.NoteText;
+            bool noteChanged = !string.Equals(note, row.PersistedNoteText, StringComparison.Ordinal);
+
+            if (row.IsInProgress)
+            {
+                SaveHistoryNote(row, note);
+                return;
+            }
+
+            if (row.Stop is not { } originalStop)
             {
                 return;
             }
@@ -855,14 +1072,20 @@ namespace work_monitor
                 return;
             }
 
-            if (newStart == row.Start && newStop == row.Stop)
+            bool timesChanged = newStart != row.Start || newStop != row.Stop;
+            if (!timesChanged)
             {
+                if (noteChanged)
+                {
+                    SaveHistoryNote(row, note);
+                }
+
                 return;
             }
 
             try
             {
-                if (!HistoryStore.ReplaceRecord(row.Start, originalStop, newStart, newStop))
+                if (!HistoryStore.ReplaceRecord(row.Start, originalStop, newStart, newStop, note))
                 {
                     ShowHistoryError("The session could not be found in the history files.");
                     row.RestorePersistedText();
@@ -876,10 +1099,93 @@ namespace work_monitor
                 return;
             }
 
-            row.Start = newStart;
-            row.Stop = newStop;
-            UpdateTodayWorkTime();
-            Dispatcher.BeginInvoke(new Action(() => RefreshHistory(newStart)));
+            row.PersistedNoteText = note;
+
+            if (timesChanged)
+            {
+                row.Start = newStart;
+                row.Stop = newStop;
+                UpdateTodayWorkTime();
+                Dispatcher.BeginInvoke(new Action(() => RefreshHistory(newStart)));
+            }
+        }
+
+        /// <summary>
+        /// Persists just the note of a history row, used by the note editor's LostFocus and by
+        /// the Esc confirmation. Unchanged notes are left alone.
+        /// </summary>
+        private bool SaveHistoryNote(HistoryRow row, string note)
+        {
+            if (string.Equals(note, row.PersistedNoteText, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (row.IsInProgress)
+            {
+                _historyRecorder.CurrentSessionNote = note;
+                row.PersistedNoteText = note;
+                return true;
+            }
+
+            try
+            {
+                if (!HistoryStore.SetNote(row.Start, note))
+                {
+                    ShowHistoryError("The session could not be found in the history files.");
+                    row.RestorePersistedText();
+                    return false;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or SecurityException)
+            {
+                ShowHistoryError($"The note could not be saved: {ex.Message}");
+                row.RestorePersistedText();
+                return false;
+            }
+
+            row.PersistedNoteText = note;
+            return true;
+        }
+
+        /// <summary>Clicking outside the note editor asks about the change, just like Esc does.</summary>
+        private void HistoryNoteTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_discardingNoteEdit)
+            {
+                return;
+            }
+
+            if (sender is TextBox textBox && textBox.DataContext is HistoryRow row)
+            {
+                ConfirmNoteChange(row, textBox.Text);
+            }
+        }
+
+        /// <summary>Asks whether to keep a changed note, then leaves the row in the chosen state.</summary>
+        private void ConfirmNoteChange(HistoryRow row, string editedNote)
+        {
+            if (string.Equals(editedNote, row.PersistedNoteText, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            MessageBoxResult answer = MessageBox.Show(
+                "Save changes to this note?",
+                "Save note",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (answer == MessageBoxResult.Yes)
+            {
+                SaveHistoryNote(row, editedNote);
+                row.NoteText = editedNote;
+            }
+            else
+            {
+                // Put the stored text back before any pending row commit runs.
+                row.NoteText = row.PersistedNoteText;
+            }
         }
 
         /// <summary>Parses the edited cell texts of a row into a new start/stop pair on the row's day.</summary>
@@ -1107,6 +1413,7 @@ namespace work_monitor
 
                 RefreshHistory();
                 UpdateTodayWorkTime();
+                UpdateStatusNote();
             }));
         }
 
@@ -1192,6 +1499,7 @@ namespace work_monitor
                             record.Start.LocalDateTime.ToString("HH:mm:ss"),
                             stop.LocalDateTime.ToString("HH:mm:ss"),
                             FormatDurationNoSeconds(duration),
+                            record.Note ?? string.Empty,
                             record.Start,
                             record.Stop,
                             isInProgress: false));
@@ -1230,6 +1538,7 @@ namespace work_monitor
                     sessionStart.LocalDateTime.ToString("HH:mm:ss"),
                     "in progress",
                     FormatDurationNoSeconds(elapsed),
+                    _historyRecorder.CurrentSessionNote ?? string.Empty,
                     sessionStart,
                     null,
                     isInProgress: true));
@@ -1350,15 +1659,18 @@ namespace work_monitor
         private string _startText;
         private string _stopText;
         private string _durationText;
-        private (string StartText, string StopText)? _editSnapshot;
+        private string _noteText;
+        private (string StartText, string StopText, string NoteText)? _editSnapshot;
 
-        public HistoryRow(DateTime date, string dateLabel, string startText, string stopText, string durationText, DateTimeOffset start, DateTimeOffset? stop, bool isInProgress)
+        public HistoryRow(DateTime date, string dateLabel, string startText, string stopText, string durationText, string noteText, DateTimeOffset start, DateTimeOffset? stop, bool isInProgress)
         {
             Date = date;
             DateLabel = dateLabel;
             _startText = startText;
             _stopText = stopText;
             _durationText = durationText;
+            _noteText = noteText;
+            PersistedNoteText = noteText;
             Start = start;
             Stop = stop;
             IsInProgress = isInProgress;
@@ -1413,9 +1725,25 @@ namespace work_monitor
 
         public string DurationText => _durationText;
 
+        /// <summary>The editable note shown in the history table.</summary>
+        public string NoteText
+        {
+            get => _noteText;
+            set
+            {
+                if (_noteText != value)
+                {
+                    _noteText = value;
+                    OnPropertyChanged(nameof(NoteText));
+                }
+            }
+        }
+
+        /// <summary>The note currently stored in history, used to detect and roll back edits.</summary>
+        public string PersistedNoteText { get; internal set; }
+
         /// <summary>
-        /// Restores the cell texts from the persisted start and stop, used after a rejected
-        /// edit.
+        /// Restores the cell texts from the persisted values, used after a rejected edit.
         /// </summary>
         public void RestorePersistedText()
         {
@@ -1424,11 +1752,13 @@ namespace work_monitor
             {
                 StopText = stop.LocalDateTime.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
             }
+
+            NoteText = PersistedNoteText;
         }
 
         void IEditableObject.BeginEdit()
         {
-            _editSnapshot ??= (_startText, _stopText);
+            _editSnapshot ??= (_startText, _stopText, _noteText);
         }
 
         void IEditableObject.CancelEdit()
@@ -1437,9 +1767,11 @@ namespace work_monitor
             {
                 _startText = snapshot.StartText;
                 _stopText = snapshot.StopText;
+                _noteText = snapshot.NoteText;
                 _editSnapshot = null;
                 OnPropertyChanged(nameof(StartText));
                 OnPropertyChanged(nameof(StopText));
+                OnPropertyChanged(nameof(NoteText));
                 UpdateDuration();
             }
         }

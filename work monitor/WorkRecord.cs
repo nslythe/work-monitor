@@ -14,6 +14,9 @@ namespace work_monitor
         /// <summary>When activity last happened before the timeout, or <c>null</c> while in progress.</summary>
         public DateTimeOffset? Stop { get; set; }
 
+        /// <summary>Optional user note, shared by every segment of a session that crosses midnight.</summary>
+        public string? Note { get; set; }
+
         [JsonIgnore]
         public TimeSpan Duration => Stop.HasValue ? Stop.Value - Start : TimeSpan.Zero;
     }
