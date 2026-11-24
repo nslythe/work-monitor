@@ -142,6 +142,16 @@ namespace work_monitor
             UpdateService.OpenUrl(_update.ReleasePageUrl);
         }
 
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            UiZoom.HandlePreviewKeyDown(e);
+        }
+
+        private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            UiZoom.HandlePreviewMouseWheel(e);
+        }
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Escape && !_busy)

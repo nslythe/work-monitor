@@ -13,514 +13,533 @@
         Icon="app.ico"
         Loaded="Window_Loaded"
         Closing="Window_Closing"
-        Closed="Window_Closed">
-    <Grid Margin="20">
-        <TabControl x:Name="MainTabs"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    Padding="0"
-                    SelectionChanged="MainTabs_SelectionChanged">
-            <TabControl.Resources>
-                <Style TargetType="TabItem">
-                    <Setter Property="FontSize" Value="14" />
-                    <Setter Property="Padding" Value="14,8" />
-                    <Setter Property="Foreground" Value="#1F2933" />
-                </Style>
-            </TabControl.Resources>
+        Closed="Window_Closed"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewMouseWheel="Window_PreviewMouseWheel">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto"
+                  Focusable="False">
+        <Grid Margin="20" LayoutTransform="{DynamicResource UiScaleTransform}">
+            <TabControl x:Name="MainTabs"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        SelectionChanged="MainTabs_SelectionChanged">
+                <TabControl.Resources>
+                    <Style TargetType="TabItem">
+                        <Setter Property="FontSize" Value="14" />
+                        <Setter Property="Padding" Value="14,8" />
+                        <Setter Property="Foreground" Value="#1F2933" />
+                    </Style>
+                </TabControl.Resources>
 
-            <TabItem Header="Status">
-                <Grid Margin="2,16,2,4">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <TabItem Header="Status">
+                    <Grid Margin="2,16,2,4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                    <Border x:Name="StatusCard"
-                            Grid.Row="0"
-                            Padding="24"
-                            CornerRadius="14"
-                            Background="#1B7F3B"
-                            Cursor="Hand"
-                            Focusable="True"
-                            PreviewMouseLeftButtonDown="StatusCard_PreviewMouseLeftButtonDown"
-                            MouseLeftButtonUp="StatusCard_Click"
-                            KeyDown="StatusCard_KeyDown">
-                        <Grid>
-                            <StackPanel x:Name="StatusDisplayPanel" VerticalAlignment="Center">
-                                <TextBlock x:Name="StateText"
-                                           Text="Working"
-                                           HorizontalAlignment="Center"
-                                           FontSize="42"
-                                           FontWeight="Bold"
-                                           Foreground="White" />
-                                <TextBlock x:Name="StateDetailText"
-                                           Text="Activity detected."
-                                           Margin="0,6,0,0"
-                                           HorizontalAlignment="Center"
-                                           TextAlignment="Center"
-                                           TextWrapping="Wrap"
-                                           FontSize="14"
-                                           Foreground="White"
-                                           Opacity="0.85" />
-                                <ScrollViewer MaxHeight="72"
-                                              Margin="0,8,0,0"
-                                              VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled">
-                                    <TextBlock x:Name="StatusNoteText"
-                                               Visibility="Collapsed"
+                        <Border x:Name="StatusCard"
+                                Grid.Row="0"
+                                Padding="24"
+                                CornerRadius="14"
+                                Background="#1B7F3B"
+                                Cursor="Hand"
+                                Focusable="True"
+                                PreviewMouseLeftButtonDown="StatusCard_PreviewMouseLeftButtonDown"
+                                MouseLeftButtonUp="StatusCard_Click"
+                                KeyDown="StatusCard_KeyDown">
+                            <Grid>
+                                <StackPanel x:Name="StatusDisplayPanel" VerticalAlignment="Center">
+                                    <TextBlock x:Name="StateText"
+                                               Text="Working"
+                                               HorizontalAlignment="Center"
+                                               FontSize="42"
+                                               FontWeight="Bold"
+                                               Foreground="White" />
+                                    <TextBlock x:Name="StateDetailText"
+                                               Text="Activity detected."
+                                               Margin="0,6,0,0"
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
-                                               FontSize="13"
+                                               FontSize="14"
                                                Foreground="White"
-                                               Opacity="0.9" />
-                                </ScrollViewer>
-                                <TextBlock x:Name="TodayWorkTimeCardText"
-                                           Text="Today: 0m 00s"
-                                           Margin="0,10,0,0"
-                                           HorizontalAlignment="Center"
+                                               Opacity="0.85" />
+                                    <ScrollViewer MaxHeight="72"
+                                                  Margin="0,8,0,0"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <TextBlock x:Name="StatusNoteText"
+                                                   Visibility="Collapsed"
+                                                   HorizontalAlignment="Center"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   FontSize="13"
+                                                   Foreground="White"
+                                                   Opacity="0.9" />
+                                    </ScrollViewer>
+                                    <TextBlock x:Name="TodayWorkTimeCardText"
+                                               Text="Today: 0m 00s"
+                                               Margin="0,10,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="White" />
+                                </StackPanel>
+
+                                <TextBox x:Name="StatusNoteEditTextBox"
+                                         Visibility="Collapsed"
+                                         VerticalAlignment="Stretch"
+                                         HorizontalAlignment="Stretch"
+                                         Margin="4"
+                                         Padding="8"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         HorizontalScrollBarVisibility="Disabled"
+                                         FontSize="16"
+                                         Background="White"
+                                         BorderBrush="#D9DEE3"
+                                         BorderThickness="1"
+                                         TextChanged="StatusNoteEditTextBox_TextChanged"
+                                         LostFocus="StatusNoteEditTextBox_LostFocus"
+                                         KeyDown="StatusNoteEditTextBox_KeyDown" />
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="1" Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Last activity"
+                                           FontSize="12"
+                                           Foreground="#616E7C" />
+                                <TextBlock x:Name="LastActivityText"
+                                           Text="--:--:--"
                                            FontSize="18"
                                            FontWeight="SemiBold"
-                                           Foreground="White" />
+                                           Foreground="#1F2933" />
                             </StackPanel>
 
-                            <TextBox x:Name="StatusNoteEditTextBox"
-                                     Visibility="Collapsed"
-                                     VerticalAlignment="Stretch"
-                                     HorizontalAlignment="Stretch"
-                                     Margin="4"
-                                     Padding="8"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Disabled"
-                                     FontSize="16"
-                                     Background="White"
-                                     BorderBrush="#D9DEE3"
-                                     BorderThickness="1"
-                                     TextChanged="StatusNoteEditTextBox_TextChanged"
-                                     LostFocus="StatusNoteEditTextBox_LostFocus"
-                                     KeyDown="StatusNoteEditTextBox_KeyDown" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Idle time / threshold"
+                                           FontSize="12"
+                                           Foreground="#616E7C" />
+                                <TextBlock x:Name="IdleTimeText"
+                                           Text="0m 00s / 15m 00s"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2933" />
+                            </StackPanel>
                         </Grid>
-                    </Border>
 
-                    <Grid Grid.Row="1" Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Last activity"
-                                       FontSize="12"
-                                       Foreground="#616E7C" />
-                            <TextBlock x:Name="LastActivityText"
-                                       Text="--:--:--"
-                                       FontSize="18"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2933" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Idle time / threshold"
-                                       FontSize="12"
-                                       Foreground="#616E7C" />
-                            <TextBlock x:Name="IdleTimeText"
-                                       Text="0m 00s / 15m 00s"
-                                       FontSize="18"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2933" />
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock x:Name="FooterText"
-                               Grid.Row="2"
-                               Margin="0,12,0,0"
-                               TextWrapping="Wrap"
-                               FontSize="12"
-                               Foreground="#616E7C" />
-                    <TextBlock x:Name="VersionText"
-                               Grid.Row="2"
-                               Margin="0,4,0,0"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Bottom"
-                               FontSize="11"
-                               Foreground="#9AA5B1" />
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="Settings">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="2,16,2,4">
-                        <TextBlock Text="Timing"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1F2933" />
-                        <TextBlock Text="How long the mouse may stay still before the state becomes Not working."
-                                   Margin="0,4,0,0"
+                        <TextBlock x:Name="FooterText"
+                                   Grid.Row="2"
+                                   Margin="0,12,0,0"
                                    TextWrapping="Wrap"
                                    FontSize="12"
                                    Foreground="#616E7C" />
+                        <TextBlock x:Name="VersionText"
+                                   Grid.Row="2"
+                                   Margin="0,4,0,0"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Bottom"
+                                   FontSize="11"
+                                   Foreground="#9AA5B1" />
+                    </Grid>
+                </TabItem>
 
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                            <TextBlock Text="Not working after"
-                                       VerticalAlignment="Center"
-                                       FontSize="14"
+                <TabItem Header="Settings">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="2,16,2,4">
+                            <TextBlock Text="Timing"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
                                        Foreground="#1F2933" />
-                            <TextBox x:Name="TimeoutTextBox"
-                                     Width="80"
-                                     Margin="8,0"
-                                     Padding="6,4"
-                                     FontSize="14"
-                                     VerticalContentAlignment="Center"
-                                     TextAlignment="Right"
-                                     TextChanged="TimeoutTextBox_TextChanged" />
-                            <TextBlock Text="minutes"
-                                       VerticalAlignment="Center"
-                                       FontSize="14"
+                            <TextBlock Text="How long the mouse may stay still before the state becomes Not working."
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Foreground="#616E7C" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <TextBlock Text="Not working after"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           Foreground="#1F2933" />
+                                <TextBox x:Name="TimeoutTextBox"
+                                         Width="80"
+                                         Margin="8,0"
+                                         Padding="6,4"
+                                         FontSize="14"
+                                         VerticalContentAlignment="Center"
+                                         TextAlignment="Right"
+                                         TextChanged="TimeoutTextBox_TextChanged" />
+                                <TextBlock Text="minutes"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           Foreground="#1F2933" />
+                            </StackPanel>
+
+                            <TextBlock x:Name="TimeoutErrorText"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Foreground="#B3261E"
+                                       Visibility="Collapsed" />
+
+                            <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+
+                            <TextBlock Text="Startup"
+                                       Margin="0,20,0,0"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
                                        Foreground="#1F2933" />
+                            <CheckBox x:Name="StartWithWindowsCheckBox"
+                                      Content="Start Work Monitor when I sign in"
+                                      Margin="0,12,0,0"
+                                      FontSize="14"
+                                      Foreground="#1F2933" />
+                            <TextBlock Text="Adds Work Monitor to your Windows user account's startup items. No administrator rights are needed."
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Foreground="#616E7C" />
+
+                            <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+
+                            <TextBlock Text="Updates"
+                                       Margin="0,20,0,0"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1F2933" />
+                            <TextBlock x:Name="UpdateVersionText"
+                                       Margin="0,6,0,0"
+                                       FontSize="12"
+                                       Foreground="#616E7C" />
+                            <TextBlock Text="Work Monitor checks GitHub for a newer release when it starts and every six hours. When one is found, you can choose whether to install it."
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Foreground="#616E7C" />
+                            <Button x:Name="CheckForUpdatesButton"
+                                    Content="Check for updates"
+                                    Click="CheckForUpdatesButton_Click"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,12,0,0"
+                                    Padding="16,7"
+                                    FontSize="13" />
+                            <TextBlock x:Name="UpdateStatusText"
+                                       Margin="0,10,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Foreground="#616E7C"
+                                       Visibility="Collapsed" />
+
+                            <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+
+                            <TextBlock Text="About"
+                                       Margin="0,20,0,0"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1F2933" />
+                            <TextBlock Text="Work Monitor is open source. Report issues, request features, or read the source code on GitHub."
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Foreground="#616E7C" />
+                            <TextBlock Margin="0,8,0,0" FontSize="14">
+                                <Hyperlink NavigateUri="https://github.com/nslythe/work-monitor"
+                                           RequestNavigate="ProjectLink_RequestNavigate">
+                                    View the project on GitHub
+                                </Hyperlink>
+                            </TextBlock>
+
+                            <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+
+                            <TextBlock Text="Display"
+                                       Margin="0,20,0,0"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1F2933" />
+                            <TextBlock Text="Use Ctrl + + or Ctrl + - to zoom the interface, Ctrl + 0 to reset to 100%. Holding Ctrl while scrolling also zooms."
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Foreground="#616E7C" />
+
+                            <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                                <Button x:Name="ApplyButton"
+                                        Content="Apply"
+                                        Click="ApplyButton_Click"
+                                        IsDefault="True"
+                                        Padding="24,8"
+                                        FontSize="14" />
+                                <Button x:Name="RestoreDefaultsButton"
+                                        Content="Restore defaults"
+                                        Click="RestoreDefaultsButton_Click"
+                                        Margin="10,0,0,0"
+                                        Padding="16,8"
+                                        FontSize="14" />
+                            </StackPanel>
+
+                            <TextBlock x:Name="SaveMessageText"
+                                       Margin="0,14,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Visibility="Collapsed" />
                         </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
 
-                        <TextBlock x:Name="TimeoutErrorText"
+                <TabItem x:Name="HistoryTab" Header="History">
+                    <Grid Margin="2,16,2,4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <WrapPanel Grid.Row="0" Orientation="Horizontal">
+                            <ComboBox x:Name="WeekComboBox"
+                                      Width="200"
+                                      Height="30"
+                                      VerticalContentAlignment="Center"
+                                      SelectionChanged="WeekComboBox_SelectionChanged" />
+                            <Button Content="Refresh"
+                                    Click="RefreshHistoryButton_Click"
+                                    Margin="10,0,0,0"
+                                    Padding="14,6" />
+                            <Button Content="Add session"
+                                    Click="AddSessionButton_Click"
+                                    Margin="8,0,0,0"
+                                    Padding="14,6"
+                                    ToolTip="Pick a day of the selected week and add a session to it" />
+                            <Button Content="Open folder"
+                                    Click="OpenHistoryFolderButton_Click"
+                                    Margin="8,0,0,0"
+                                    Padding="14,6" />
+                            <Button Content="Archive"
+                                    Click="ArchiveHistoryButton_Click"
+                                    Margin="8,0,0,0"
+                                    Padding="14,6" />
+                        </WrapPanel>
+
+                        <Grid Grid.Row="1" Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="HistorySummaryText"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1F2933" />
+                            <TextBlock x:Name="CurrentSessionText"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="#616E7C" />
+                        </Grid>
+
+                        <TextBlock x:Name="HistoryErrorText"
+                                   Grid.Row="2"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap"
                                    FontSize="12"
                                    Foreground="#B3261E"
                                    Visibility="Collapsed" />
 
-                        <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
+                        <DataGrid x:Name="HistoryDataGrid"
+                                  Grid.Row="3"
+                                  Margin="0,14,0,0"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserResizeRows="False"
+                                  CanUserSortColumns="False"
+                                  CanUserReorderColumns="False"
+                                  HeadersVisibility="Column"
+                                  SelectionMode="Single"
+                                  Background="White"
+                                  RowBackground="White"
+                                  AlternatingRowBackground="#FAFBFC"
+                                  BorderBrush="#D9DEE3"
+                                  BorderThickness="1"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="#E7EAEE"
+                                  ColumnHeaderHeight="30"
+                                  FontSize="13"
+                                  BeginningEdit="HistoryDataGrid_BeginningEdit"
+                                  RowEditEnding="HistoryDataGrid_RowEditEnding"
+                                  PreviewKeyDown="HistoryDataGrid_PreviewKeyDown"
+                                  PreviewMouseRightButtonDown="HistoryDataGrid_PreviewMouseRightButtonDown">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copy time" Click="CopyHistoryTimeMenuItem_Click" />
+                                    <MenuItem Header="Delete" Click="DeleteHistoryMenuItem_Click" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="MinHeight" Value="30" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsInProgress}" Value="True">
+                                            <Setter Property="Foreground" Value="#9AA5B1" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Margin="0,10,0,2">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="13"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#1F2933"
+                                                           VerticalAlignment="Center" />
+                                                <Button Content="+ Add session"
+                                                        Margin="12,0,0,0"
+                                                        Padding="8,1"
+                                                        FontSize="11"
+                                                        VerticalAlignment="Center"
+                                                        Tag="{Binding}"
+                                                        Click="AddSessionForGroupButton_Click" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </DataGrid.GroupStyle>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Started"
+                                                    Width="110"
+                                                    Binding="{Binding StartText}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="Margin" Value="4,0" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Stopped"
+                                                    Width="110"
+                                                    Binding="{Binding StopText}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="Margin" Value="4,0" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Duration"
+                                                    Width="100"
+                                                    IsReadOnly="True"
+                                                    Binding="{Binding DurationText}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="Margin" Value="4,0" />
+                                            <Setter Property="Foreground" Value="#616E7C" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTemplateColumn x:Name="NoteColumn"
+                                                        Header="Note"
+                                                        Width="*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding NoteText}"
+                                                       ToolTip="{Binding NoteText}"
+                                                       TextWrapping="Wrap"
+                                                       VerticalAlignment="Center"
+                                                       Margin="4,2" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                    <DataGridTemplateColumn.CellEditingTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding NoteText, UpdateSourceTrigger=PropertyChanged}"
+                                                     AcceptsReturn="True"
+                                                     TextWrapping="Wrap"
+                                                     VerticalScrollBarVisibility="Auto"
+                                                     HorizontalScrollBarVisibility="Disabled"
+                                                     MaxLines="6"
+                                                     Margin="2,1"
+                                                     LostFocus="HistoryNoteTextBox_LostFocus" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="44"
+                                                        CanUserResize="False"
+                                                        IsReadOnly="True">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Click="DeleteRowButton_Click"
+                                                    IsEnabled="{Binding IsEditable}"
+                                                    Width="28"
+                                                    Height="24"
+                                                    HorizontalAlignment="Center"
+                                                    ToolTip="Delete this session">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border x:Name="HoverBackground"
+                                                                Background="Transparent"
+                                                                CornerRadius="4">
+                                                            <TextBlock x:Name="Glyph"
+                                                                       Text="✕"
+                                                                       FontSize="12"
+                                                                       Foreground="#9AA5B1"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Glyph" Property="Foreground" Value="#B3261E" />
+                                                                <Setter TargetName="HoverBackground" Property="Background" Value="#FDECEA" />
+                                                            </Trigger>
+                                                            <Trigger Property="IsEnabled" Value="False">
+                                                                <Setter TargetName="Glyph" Property="Opacity" Value="0.3" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
 
-                        <TextBlock Text="Startup"
-                                   Margin="0,20,0,0"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1F2933" />
-                        <CheckBox x:Name="StartWithWindowsCheckBox"
-                                  Content="Start Work Monitor when I sign in"
-                                  Margin="0,12,0,0"
-                                  FontSize="14"
-                                  Foreground="#1F2933" />
-                        <TextBlock Text="Adds Work Monitor to your Windows user account's startup items. No administrator rights are needed."
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap"
-                                   FontSize="12"
-                                   Foreground="#616E7C" />
-
-                        <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
-
-                        <TextBlock Text="Updates"
-                                   Margin="0,20,0,0"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1F2933" />
-                        <TextBlock x:Name="UpdateVersionText"
-                                   Margin="0,6,0,0"
-                                   FontSize="12"
-                                   Foreground="#616E7C" />
-                        <TextBlock Text="Work Monitor checks GitHub for a newer release when it starts and every six hours. When one is found, you can choose whether to install it."
-                                   Margin="0,4,0,0"
-                                   TextWrapping="Wrap"
-                                   FontSize="12"
-                                   Foreground="#616E7C" />
-                        <Button x:Name="CheckForUpdatesButton"
-                                Content="Check for updates"
-                                Click="CheckForUpdatesButton_Click"
-                                HorizontalAlignment="Left"
-                                Margin="0,12,0,0"
-                                Padding="16,7"
-                                FontSize="13" />
-                        <TextBlock x:Name="UpdateStatusText"
-                                   Margin="0,10,0,0"
-                                   TextWrapping="Wrap"
-                                   FontSize="12"
-                                   Foreground="#616E7C"
-                                   Visibility="Collapsed" />
-
-                        <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
-
-                        <TextBlock Text="About"
-                                   Margin="0,20,0,0"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1F2933" />
-                        <TextBlock Text="Work Monitor is open source. Report issues, request features, or read the source code on GitHub."
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap"
-                                   FontSize="12"
-                                   Foreground="#616E7C" />
-                        <TextBlock Margin="0,8,0,0" FontSize="14">
-                            <Hyperlink NavigateUri="https://github.com/nslythe/work-monitor"
-                                       RequestNavigate="ProjectLink_RequestNavigate">
-                                View the project on GitHub
-                            </Hyperlink>
-                        </TextBlock>
-
-                        <Border Height="1" Margin="0,20,0,0" Background="#D9DEE3" />
-
-                        <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
-                            <Button x:Name="ApplyButton"
-                                    Content="Apply"
-                                    Click="ApplyButton_Click"
-                                    IsDefault="True"
-                                    Padding="24,8"
-                                    FontSize="14" />
-                            <Button x:Name="RestoreDefaultsButton"
-                                    Content="Restore defaults"
-                                    Click="RestoreDefaultsButton_Click"
-                                    Margin="10,0,0,0"
-                                    Padding="16,8"
-                                    FontSize="14" />
-                        </StackPanel>
-
-                        <TextBlock x:Name="SaveMessageText"
-                                   Margin="0,14,0,0"
-                                   TextWrapping="Wrap"
-                                   FontSize="12"
-                                   Visibility="Collapsed" />
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem x:Name="HistoryTab" Header="History">
-                <Grid Margin="2,16,2,4">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <WrapPanel Grid.Row="0" Orientation="Horizontal">
-                        <ComboBox x:Name="WeekComboBox"
-                                  Width="200"
-                                  Height="30"
-                                  VerticalContentAlignment="Center"
-                                  SelectionChanged="WeekComboBox_SelectionChanged" />
-                        <Button Content="Refresh"
-                                Click="RefreshHistoryButton_Click"
-                                Margin="10,0,0,0"
-                                Padding="14,6" />
-                        <Button Content="Add session"
-                                Click="AddSessionButton_Click"
-                                Margin="8,0,0,0"
-                                Padding="14,6"
-                                ToolTip="Pick a day of the selected week and add a session to it" />
-                        <Button Content="Open folder"
-                                Click="OpenHistoryFolderButton_Click"
-                                Margin="8,0,0,0"
-                                Padding="14,6" />
-                        <Button Content="Archive"
-                                Click="ArchiveHistoryButton_Click"
-                                Margin="8,0,0,0"
-                                Padding="14,6" />
-                    </WrapPanel>
-
-                    <Grid Grid.Row="1" Margin="0,14,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="HistorySummaryText"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1F2933" />
-                        <TextBlock x:Name="CurrentSessionText"
-                                   Grid.Column="1"
+                        <TextBlock x:Name="HistoryEmptyText"
+                                   Grid.Row="3"
+                                   Text="No work sessions recorded for this week yet."
+                                   HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
+                                   Visibility="Collapsed" />
+
+                        <TextBlock x:Name="CopyStatusText"
+                                   Grid.Row="3"
+                                   Text="Copied"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Bottom"
+                                   Margin="0,0,8,8"
                                    FontSize="12"
-                                   Foreground="#616E7C" />
+                                   Foreground="#1B7F3B"
+                                   Visibility="Collapsed" />
                     </Grid>
+                </TabItem>
 
-                    <TextBlock x:Name="HistoryErrorText"
-                               Grid.Row="2"
-                               Margin="0,6,0,0"
-                               TextWrapping="Wrap"
-                               FontSize="12"
-                               Foreground="#B3261E"
-                               Visibility="Collapsed" />
-
-                    <DataGrid x:Name="HistoryDataGrid"
-                              Grid.Row="3"
-                              Margin="0,14,0,0"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              CanUserDeleteRows="False"
-                              CanUserResizeRows="False"
-                              CanUserSortColumns="False"
-                              CanUserReorderColumns="False"
-                              HeadersVisibility="Column"
-                              SelectionMode="Single"
-                              Background="White"
-                              RowBackground="White"
-                              AlternatingRowBackground="#FAFBFC"
-                              BorderBrush="#D9DEE3"
-                              BorderThickness="1"
-                              GridLinesVisibility="Horizontal"
-                              HorizontalGridLinesBrush="#E7EAEE"
-                              ColumnHeaderHeight="30"
-                              FontSize="13"
-                              BeginningEdit="HistoryDataGrid_BeginningEdit"
-                              RowEditEnding="HistoryDataGrid_RowEditEnding"
-                              PreviewKeyDown="HistoryDataGrid_PreviewKeyDown"
-                              PreviewMouseRightButtonDown="HistoryDataGrid_PreviewMouseRightButtonDown">
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Copy time" Click="CopyHistoryTimeMenuItem_Click" />
-                                <MenuItem Header="Delete" Click="DeleteHistoryMenuItem_Click" />
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                        <DataGrid.RowStyle>
-                            <Style TargetType="DataGridRow">
-                                <Setter Property="MinHeight" Value="30" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsInProgress}" Value="True">
-                                        <Setter Property="Foreground" Value="#9AA5B1" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </DataGrid.RowStyle>
-                        <DataGrid.GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.HeaderTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,2">
-                                            <TextBlock Text="{Binding Name}"
-                                                       FontSize="13"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#1F2933"
-                                                       VerticalAlignment="Center" />
-                                            <Button Content="+ Add session"
-                                                    Margin="12,0,0,0"
-                                                    Padding="8,1"
-                                                    FontSize="11"
-                                                    VerticalAlignment="Center"
-                                                    Tag="{Binding}"
-                                                    Click="AddSessionForGroupButton_Click" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </GroupStyle.HeaderTemplate>
-                            </GroupStyle>
-                        </DataGrid.GroupStyle>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Started"
-                                                Width="110"
-                                                Binding="{Binding StartText}">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center" />
-                                        <Setter Property="Margin" Value="4,0" />
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="Stopped"
-                                                Width="110"
-                                                Binding="{Binding StopText}">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center" />
-                                        <Setter Property="Margin" Value="4,0" />
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="Duration"
-                                                Width="100"
-                                                IsReadOnly="True"
-                                                Binding="{Binding DurationText}">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center" />
-                                        <Setter Property="Margin" Value="4,0" />
-                                        <Setter Property="Foreground" Value="#616E7C" />
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTemplateColumn x:Name="NoteColumn"
-                                                    Header="Note"
-                                                    Width="*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding NoteText}"
-                                                   ToolTip="{Binding NoteText}"
-                                                   TextWrapping="Wrap"
-                                                   VerticalAlignment="Center"
-                                                   Margin="4,2" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                                <DataGridTemplateColumn.CellEditingTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding NoteText, UpdateSourceTrigger=PropertyChanged}"
-                                                 AcceptsReturn="True"
-                                                 TextWrapping="Wrap"
-                                                 VerticalScrollBarVisibility="Auto"
-                                                 HorizontalScrollBarVisibility="Disabled"
-                                                 MaxLines="6"
-                                                 Margin="2,1"
-                                                 LostFocus="HistoryNoteTextBox_LostFocus" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="44"
-                                                    CanUserResize="False"
-                                                    IsReadOnly="True">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Button Click="DeleteRowButton_Click"
-                                                IsEnabled="{Binding IsEditable}"
-                                                Width="28"
-                                                Height="24"
-                                                HorizontalAlignment="Center"
-                                                ToolTip="Delete this session">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border x:Name="HoverBackground"
-                                                            Background="Transparent"
-                                                            CornerRadius="4">
-                                                        <TextBlock x:Name="Glyph"
-                                                                   Text="✕"
-                                                                   FontSize="12"
-                                                                   Foreground="#9AA5B1"
-                                                                   HorizontalAlignment="Center"
-                                                                   VerticalAlignment="Center" />
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="Glyph" Property="Foreground" Value="#B3261E" />
-                                                            <Setter TargetName="HoverBackground" Property="Background" Value="#FDECEA" />
-                                                        </Trigger>
-                                                        <Trigger Property="IsEnabled" Value="False">
-                                                            <Setter TargetName="Glyph" Property="Opacity" Value="0.3" />
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <TextBlock x:Name="HistoryEmptyText"
-                               Grid.Row="3"
-                               Text="No work sessions recorded for this week yet."
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Visibility="Collapsed" />
-
-                    <TextBlock x:Name="CopyStatusText"
-                               Grid.Row="3"
-                               Text="Copied"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Bottom"
-                               Margin="0,0,8,8"
-                               FontSize="12"
-                               Foreground="#1B7F3B"
-                               Visibility="Collapsed" />
-                </Grid>
-            </TabItem>
-
-        </TabControl>
-    </Grid>
+            </TabControl>
+        </Grid>
+    </ScrollViewer>
 </Window>

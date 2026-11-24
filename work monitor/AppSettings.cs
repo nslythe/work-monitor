@@ -12,8 +12,15 @@ namespace work_monitor
         public const int MinIdleTimeoutMinutes = 1;
         public const int MaxIdleTimeoutMinutes = 1440;
 
+        public const double DefaultUiScale = 1.0;
+        public const double MinUiScale = 0.8;
+        public const double MaxUiScale = 2.0;
+
         /// <summary>Minutes without mouse movement before the state becomes Not working.</summary>
         public int IdleTimeoutMinutes { get; set; } = DefaultIdleTimeoutMinutes;
+
+        /// <summary>Interface zoom factor, shared by every window.</summary>
+        public double UiScale { get; set; } = DefaultUiScale;
 
         /// <summary>Release version the user asked to skip, so it is not offered again.</summary>
         public string? SkippedUpdateVersion { get; set; }
@@ -28,7 +35,9 @@ namespace work_monitor
         public TimeSpan IdleTimeout => TimeSpan.FromMinutes(IdleTimeoutMinutes);
 
         [JsonIgnore]
-        public bool IsValid => IdleTimeoutMinutes is >= MinIdleTimeoutMinutes and <= MaxIdleTimeoutMinutes;
+        public bool IsValid =>
+            IdleTimeoutMinutes is >= MinIdleTimeoutMinutes and <= MaxIdleTimeoutMinutes &&
+            UiScale is >= MinUiScale and <= MaxUiScale;
 
         public static AppSettings CreateDefault() => new();
     }

@@ -58,6 +58,8 @@ namespace work_monitor
 
             InitializeComponent();
 
+            UiZoom.Initialize(_settings);
+
             VersionText.Text = $"Version {UpdateService.CurrentVersionText}";
             UpdateVersionText.Text = $"Installed version {UpdateService.CurrentVersionText}";
 
@@ -79,6 +81,16 @@ namespace work_monitor
             TimeoutTextBox.Text = _settings.IdleTimeoutMinutes.ToString(CultureInfo.InvariantCulture);
             StartWithWindowsCheckBox.IsChecked = TryGetStartupEnabled();
             UpdateFooter();
+        }
+
+        private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            UiZoom.HandlePreviewKeyDown(e);
+        }
+
+        private void Window_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            UiZoom.HandlePreviewMouseWheel(e);
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)

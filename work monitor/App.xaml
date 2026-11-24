@@ -4,6 +4,7 @@
              xmlns:local="clr-namespace:work_monitor"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-        
+        <!-- Shared by both windows; UiZoom replaces this with a fresh transform on zoom. -->
+        <ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1" />
     </Application.Resources>
 </Application>
